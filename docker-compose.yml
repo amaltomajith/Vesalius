@@ -1,0 +1,148 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: pipeline
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_superuser_password
+    secrets: [postgres_superuser_password]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # Host port 5433, not 5432: this machine already runs a native Postgres service
+    # bound to 5432, and Docker's port-forward silently collides with it rather than
+    # erroring -- connections to localhost:5432 were reaching the native service, not
+    # this container. Inside the Docker network other services still use 5432.
+    ports: ["5433:5432"]
+
+  minio:
+    image: quay.io/minio/minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD_FILE: /run/secrets/minio_root_password
+    secrets: [minio_root_password]
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports: ["9000:9000", "9001:9001"]
+
+  minio-init:
+    build: ./docker/minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD_FILE: /run/secrets/minio_root_password
+      MINIO_BRONZE_ACCESS_KEY: ${MINIO_BRONZE_ACCESS_KEY}
+      MINIO_BRONZE_SECRET_KEY: ${MINIO_BRONZE_SECRET_KEY}
+      MINIO_SILVER_ACCESS_KEY: ${MINIO_SILVER_ACCESS_KEY}
+      MINIO_SILVER_SECRET_KEY: ${MINIO_SILVER_SECRET_KEY}
+      MINIO_GOLD_ACCESS_KEY: ${MINIO_GOLD_ACCESS_KEY}
+      MINIO_GOLD_SECRET_KEY: ${MINIO_GOLD_SECRET_KEY}
+      MINIO_QUARANTINE_ACCESS_KEY: ${MINIO_QUARANTINE_ACCESS_KEY}
+      MINIO_QUARANTINE_SECRET_KEY: ${MINIO_QUARANTINE_SECRET_KEY}
+    secrets: [minio_root_password]
+    restart: "no"
+
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/api/Dockerfile
+    command: alembic upgrade head
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      MIGRATOR_DATABASE_URL: postgresql+psycopg://postgres:${POSTGRES_SUPERUSER_PASSWORD}@postgres:5432/pipeline
+      PIPELINE_SVC_PASSWORD: ${PIPELINE_SVC_PASSWORD}
+      SERVING_RO_PASSWORD: ${SERVING_RO_PASSWORD}
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      PIPELINE_DATABASE_URL: postgresql+psycopg://pipeline_svc:${PIPELINE_SVC_PASSWORD}@postgres:5432/pipeline
+      SERVING_DATABASE_URL: postgresql+psycopg://serving_ro:${SERVING_RO_PASSWORD}@postgres:5432/pipeline
+      MINIO_ENDPOINT: minio:9000
+      MINIO_SECURE: "false"
+      MINIO_BRONZE_ACCESS_KEY: ${MINIO_BRONZE_ACCESS_KEY}
+      MINIO_BRONZE_SECRET_KEY: ${MINIO_BRONZE_SECRET_KEY}
+      MINIO_SILVER_ACCESS_KEY: ${MINIO_SILVER_ACCESS_KEY}
+      MINIO_SILVER_SECRET_KEY: ${MINIO_SILVER_SECRET_KEY}
+      MINIO_GOLD_ACCESS_KEY: ${MINIO_GOLD_ACCESS_KEY}
+      MINIO_GOLD_SECRET_KEY: ${MINIO_GOLD_SECRET_KEY}
+      MINIO_QUARANTINE_ACCESS_KEY: ${MINIO_QUARANTINE_ACCESS_KEY}
+      MINIO_QUARANTINE_SECRET_KEY: ${MINIO_QUARANTINE_SECRET_KEY}
+      PIPELINE_VERSION: "0.1.0"
+      # Used by S4 for HMAC-keyed UID remap / date shift / patient pseudonym.
+      DEID_UID_SECRET: ${DEID_UID_SECRET:-}
+      DEID_DATE_SHIFT_SECRET: ${DEID_DATE_SHIFT_SECRET:-}
+    ports: ["8000:8000"]
+
+  # OCR-dependent tests (channel 3 / S4 redaction, S5 verification, the PHI injection proof)
+  # need the real tesseract binary, which only exists inside this image -- see
+  # docker/api/Dockerfile. Never started by plain `docker compose up`; run explicitly via
+  # `docker compose --profile test run --rm test`.
+  test:
+    build:
+      context: .
+      dockerfile: docker/api/Dockerfile
+    command: ["sh", "-c", "pip install --no-cache-dir -e .[dev] && pytest tests/ -m 'integration or ocr' -v"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      PIPELINE_INTEGRATION_TESTS: "1"
+      PIPELINE_DATABASE_URL: postgresql+psycopg://pipeline_svc:${PIPELINE_SVC_PASSWORD}@postgres:5432/pipeline
+      SERVING_DATABASE_URL: postgresql+psycopg://serving_ro:${SERVING_RO_PASSWORD}@postgres:5432/pipeline
+      MINIO_ENDPOINT: minio:9000
+      MINIO_SECURE: "false"
+      MINIO_BRONZE_ACCESS_KEY: ${MINIO_BRONZE_ACCESS_KEY}
+      MINIO_BRONZE_SECRET_KEY: ${MINIO_BRONZE_SECRET_KEY}
+      MINIO_SILVER_ACCESS_KEY: ${MINIO_SILVER_ACCESS_KEY}
+      MINIO_SILVER_SECRET_KEY: ${MINIO_SILVER_SECRET_KEY}
+      MINIO_GOLD_ACCESS_KEY: ${MINIO_GOLD_ACCESS_KEY}
+      MINIO_GOLD_SECRET_KEY: ${MINIO_GOLD_SECRET_KEY}
+      MINIO_QUARANTINE_ACCESS_KEY: ${MINIO_QUARANTINE_ACCESS_KEY}
+      MINIO_QUARANTINE_SECRET_KEY: ${MINIO_QUARANTINE_SECRET_KEY}
+      PIPELINE_VERSION: "0.1.0"
+      DEID_UID_SECRET: ${DEID_UID_SECRET:-}
+      DEID_DATE_SHIFT_SECRET: ${DEID_DATE_SHIFT_SECRET:-}
+    profiles: ["test"]
+
+secrets:
+  postgres_superuser_password:
+    file: ./secrets/postgres_superuser_password
+  minio_root_password:
+    file: ./secrets/minio_root_password
+
+volumes:
+  postgres_data: {}
+  minio_data: {}

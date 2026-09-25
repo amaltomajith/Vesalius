@@ -1,0 +1,108 @@
+[project]
+name = "medical-imaging-pipeline"
+version = "0.1.0"
+description = "Governed data pipeline for clinical imaging: DICOM ingest, de-identification, and NIfTI/GLB export with full lineage."
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.5",
+    "uvicorn[standard]>=0.30",
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    "psycopg[binary]>=3.2",
+    "minio>=7.2",
+    "pydicom>=2.4",
+    "python-multipart>=0.0.9",
+    # Stack dependencies for later stages (S6-S11). Not imported by S1/S2 code,
+    # included now per CLAUDE.md's stack list so pyproject doesn't need rework.
+    "simpleitk>=2.3",
+    "numpy>=1.26",
+    "scikit-image>=0.24",
+    "scipy>=1.11",
+    "trimesh>=4.4",
+    "pymeshlab>=2023.12",
+    "pytesseract>=0.3",
+    "pillow>=10.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "pytest>=8.3",
+    "pytest-cov>=5.0",
+    "types-Pillow",
+    "httpx>=0.27",
+]
+
+[project.scripts]
+pipeline = "pipeline.cli:app"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "N"]
+ignore = [
+    "B008",  # FastAPI's Depends() default-argument pattern
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["N806"]
+"migrations/*" = ["E501"]
+
+[tool.mypy]
+# Not pinned to the project's Python 3.11 floor: numpy's installed stubs require
+# python_version >= 3.12 to parse (pydicom imports numpy internally, and since S3
+# common/dicom_geometry.py imports it directly too). mypy's python_version only gates
+# stdlib/stub syntax selection, not our own code, which uses no 3.12+-only syntax.
+mypy_path = "src"
+explicit_package_bases = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+
+[[tool.mypy.overrides]]
+module = [
+    "pydicom.*",
+    "minio.*",
+    "trimesh.*",
+    "pymeshlab.*",
+    "pytesseract.*",
+    "skimage.*",
+    "SimpleITK.*",
+    "scipy.*",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# numpy's stubs (as installed) require python_version >= 3.12 to parse. numpy is now
+# imported directly by common/dicom_geometry.py (S3); skip following its stubs entirely
+# rather than raising our target version project-wide for one dependency's stub floor.
+module = ["numpy", "numpy.*"]
+ignore_missing_imports = true
+follow_imports = "skip"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+markers = [
+    "integration: requires live Postgres/MinIO (docker compose up first)",
+    "ocr: requires the real tesseract binary (docker compose --profile test run --rm test)",
+]
+
+[tool.coverage.run]
+source = ["src"]

@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.env
+secrets/*
+!secrets/.gitkeep
+*.egg-info/
+build/
+dist/
+# local integration-test env (dev secrets)
+.integ_env.sh
