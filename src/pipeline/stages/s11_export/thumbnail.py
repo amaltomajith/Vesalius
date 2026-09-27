@@ -1,7 +1,7 @@
 """S11's thumbnail: the middle axial slice of the GATED intensity volume, percentile-clipped and
 stretched to 8-bit, resized to a fixed size, PNG-encoded via `pillow` (already a dependency -- no
-3-D renderer added; see the plan's own note on why: no renderer is in the approved stack, and
-Docker already needed three extra system libraries just for `pymeshlab`'s headless decimation).
+3-D renderer added; see the plan's own note on why: no renderer is in the approved stack, and a
+renderer would bring GL system libraries back into the image).
 
 `render_thumbnail_png` takes raw NIfTI BYTES only -- never a `series_id` or DB `Session` -- so it
 is structurally unable to read silver itself; the caller (`service.py`) is responsible for

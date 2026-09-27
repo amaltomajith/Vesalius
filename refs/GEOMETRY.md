@@ -190,6 +190,12 @@ ms.meshing_decimation_quadric_edge_collapse(
 
 Quadric edge collapse preserves shape far better than vertex clustering.
 
+> **Project deviation (deployment to ARM64):** S10 uses `fast_simplification.simplify(points,
+> faces, target_count=...)`, the same quadric edge-collapse family, because pymeshlab ships no
+> aarch64 wheel. It has no `preserveboundary`/`preservenormal` options; this is recorded as an S10
+> residual risk. Measured parity with the snippet above: exact target face count, byte-identical
+> repeated runs, volume within 0.3% of pymeshlab's.
+
 **Face budgets:** ~200k for a detailed model, ~50k for web-interactive, ~10k for a thumbnail.
 Marching cubes on a full CT commonly yields 2–5 million faces, so decimation is not optional.
 

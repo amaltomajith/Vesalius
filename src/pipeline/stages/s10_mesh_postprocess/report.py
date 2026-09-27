@@ -20,8 +20,8 @@ RESIDUAL_RISKS: tuple[str, ...] = (
     "Taubin and decimation parameters are unvalidated placeholders on real anatomy "
     "(GEOMETRY.md's own example values, with the Taubin nu sign corrected -- see "
     "mesh_postprocess.py)",
-    "pymeshlab's preserveboundary/preservenormal decimation options are trusted, not "
-    "independently re-verified",
+    "fast-simplification has no boundary- or normal-preservation option (pymeshlab's "
+    "preserveboundary/preservenormal); open boundaries of a mesh may move during decimation",
     "largest-component selection at the mesh level can still discard a real disconnected "
     "anatomical structure -- the same class of risk as S8's voxel-level version",
     "decimation determinism was verified on this project's phantom/synthetic scale, not at "

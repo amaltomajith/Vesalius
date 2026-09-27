@@ -92,6 +92,33 @@ def test_decimation_reduces_the_face_count_toward_the_target() -> None:
     assert r.stats["final_face_count"] > 0
 
 
+def test_decimation_lands_on_the_exact_target_face_count() -> None:
+    sphere = trimesh.creation.icosphere(subdivisions=5, radius=10.0)  # 20,480 faces
+    for target in (5_000, 800):
+        r = _run(sphere.vertices, sphere.faces, target_faces=target)
+        assert r.stats["final_face_count"] == target
+
+
+def test_decimation_preserves_volume_on_a_noisy_closed_surface() -> None:
+    """The measured property that justified swapping pymeshlab for fast-simplification: a
+    quadric decimation to ~6% of the faces keeps the enclosed volume within 1.5%."""
+    sphere = trimesh.creation.icosphere(subdivisions=5, radius=40.0)
+    rng = np.random.default_rng(0)
+    noisy = sphere.vertices + rng.normal(scale=0.3, size=sphere.vertices.shape)
+    smoothed_only = _run(noisy, sphere.faces, target_faces=100_000)
+    decimated = _run(noisy, sphere.faces, target_faces=1_200)
+    before = trimesh.Trimesh(smoothed_only.vertices, smoothed_only.faces, process=False).volume
+    after = trimesh.Trimesh(decimated.vertices, decimated.faces, process=False).volume
+    assert decimated.stats["decimation_applied"] is True
+    assert abs(after / before - 1.0) < 0.015
+
+
+def test_decimation_leaves_no_unreferenced_vertices() -> None:
+    sphere = trimesh.creation.icosphere(subdivisions=4, radius=10.0)
+    r = _run(sphere.vertices, sphere.faces, target_faces=500)
+    assert len(np.unique(r.faces)) == len(r.vertices)
+
+
 def test_decimation_is_skipped_and_never_inflates_a_small_mesh() -> None:
     box = trimesh.creation.box(extents=(10, 10, 10))
     r = _run(box.vertices, box.faces, target_faces=10_000)  # way more than a box needs
@@ -117,7 +144,7 @@ def test_normals_are_computed_and_match_the_vertex_count() -> None:
 
 
 def test_fix_normals_makes_winding_consistent_even_from_a_badly_wound_input() -> None:
-    """GEOMETRY.md: "decimation invalidates normals" -- pymeshlab's decimation was found to
+    """GEOMETRY.md: "decimation invalidates normals" -- quadric decimation was found to
     preserve consistent winding on a well-formed input, so this test manufactures the
     inconsistency directly (reversing ~half the input faces' winding) rather than relying on
     decimation to happen to produce it. Without the final `fix_normals()` step, this input

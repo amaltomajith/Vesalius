@@ -16,18 +16,21 @@ over the same 100 iterations preserves volume to within 1.2%. This module uses `
 corrected, magnitude kept); `test_mesh_postprocess.py` pins the volume-preservation property down
 directly, and the mutation sweep flips the sign back to prove the test would catch a regression.
 
-**Decimation determinism:** `pymeshlab`'s quadric edge collapse was verified empirically
-byte-identical across repeated runs on a 485k-face phantom mesh decimated to 50k faces -- no
-thread-pinning workaround needed, unlike CLAUDE.md's generic mesh-library-threading warning.
-Recorded as evidence, not assumed; `test_mesh_postprocess.py` reproduces the check.
+**Decimator: `fast-simplification` (quadric edge collapse, Fast-Quadric-Mesh-Simplification),
+not pymeshlab.** pymeshlab ships no aarch64 wheel or sdist, and deployment targets an ARM VM.
+Measured before the swap on a noisy 81,920-face icosphere: it lands on the exact target face count
+(50k/20k/5k/800), is byte-identical across repeated runs (single-threaded C++, no thread-pinning
+needed), and preserves volume within 0.3% of pymeshlab's result at every target. It has no
+`preserveboundary` option; see report.py's residual risks. `test_mesh_postprocess.py` pins the
+determinism, the target and the volume properties.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
+import fast_simplification
 import numpy as np
-import pymeshlab
 import trimesh
 
 from pipeline.common.errors import MeshPostconditionError, MeshZeroFacesError
@@ -102,16 +105,13 @@ def postprocess_mesh(
     # 4. quadric edge-collapse decimation, skipped (never inflated) when already under budget
     decimation_applied = after_cleanup_faces > target_faces
     if decimation_applied:
-        ms = pymeshlab.MeshSet()
-        ms.add_mesh(pymeshlab.Mesh(mesh.vertices, mesh.faces))
-        ms.meshing_decimation_quadric_edge_collapse(
-            targetfacenum=target_faces,
-            preserveboundary=True,
-            preservenormal=True,
-            planarquadric=True,
+        points, simplified = fast_simplification.simplify(
+            np.ascontiguousarray(mesh.vertices, dtype=np.float64),
+            np.ascontiguousarray(mesh.faces, dtype=np.int32),
+            target_count=target_faces,
         )
-        m = ms.current_mesh()
-        mesh = _mesh(m.vertex_matrix(), m.face_matrix())
+        mesh = _mesh(np.asarray(points, dtype=np.float64), np.asarray(simplified, dtype=np.int64))
+        mesh.remove_unreferenced_vertices()
     after_decimation_faces = int(len(mesh.faces))
     _require_faces(mesh, step="decimation")
 

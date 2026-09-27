@@ -13,6 +13,11 @@ dependencies = [
     "psycopg[binary]>=3.2",
     "minio>=7.2",
     "pydicom>=2.4",
+    # Decoders for compressed pixel data. Real CT is very often JPEG Lossless / JPEG 2000; without
+    # these S3 rightly cannot read the pixels and refuses the scan (QG_PIXEL_DECODE_FAILED).
+    "pylibjpeg>=2.0",
+    "pylibjpeg-libjpeg>=2.1",
+    "pylibjpeg-openjpeg>=2.3",
     "python-multipart>=0.0.9",
     # Stack dependencies for later stages (S6-S11). Not imported by S1/S2 code,
     # included now per CLAUDE.md's stack list so pyproject doesn't need rework.
@@ -21,7 +26,8 @@ dependencies = [
     "scikit-image>=0.24",
     "scipy>=1.11",
     "trimesh>=4.4",
-    "pymeshlab>=2023.12",
+    # S10 decimation; pymeshlab was dropped because it ships no aarch64 wheel
+    "fast-simplification==0.2.0",
     "pytesseract>=0.3",
     "pillow>=10.4",
 ]
@@ -60,6 +66,10 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["N806"]
 "migrations/*" = ["E501"]
+# plain-language prose meant to read as sentences, not wrapped code
+"src/pipeline/demo/explain.py" = ["E501"]
+"src/pipeline/demo/proofs.py" = ["E501"]
+"src/pipeline/demo/report.py" = ["E501"]
 
 [tool.mypy]
 # Not pinned to the project's Python 3.11 floor: numpy's installed stubs require
@@ -78,9 +88,11 @@ no_implicit_optional = true
 [[tool.mypy.overrides]]
 module = [
     "pydicom.*",
+    "totalsegmentator.*",  # S8 structures mode: only installed in the api image
+    "nibabel.*",
     "minio.*",
     "trimesh.*",
-    "pymeshlab.*",
+    "fast_simplification.*",
     "pytesseract.*",
     "skimage.*",
     "SimpleITK.*",

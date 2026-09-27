@@ -9,8 +9,11 @@ other S7-S9 threshold.
 from __future__ import annotations
 
 STAGE = "S10"
-STAGE_VERSION = "1.0.0"
-PARAMS_VERSION = "1"
+# 1.1.0 / 2: decimator swapped from pymeshlab to fast-simplification (aarch64 has no pymeshlab)
+STAGE_VERSION = "1.1.0"
+PARAMS_VERSION = "2"
+
+DECIMATOR = "fast-simplification==0.2.0 quadric edge collapse"
 
 DEFAULT_PRESET = "bone"
 
@@ -37,4 +40,5 @@ def algorithm_params(target_faces: int) -> dict[str, object]:
         "taubin_nu": TAUBIN_NU,
         "taubin_iterations": TAUBIN_ITERATIONS,
         "target_faces": target_faces,
+        "decimator": DECIMATOR,
     }
