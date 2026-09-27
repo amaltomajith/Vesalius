@@ -1,0 +1,58 @@
+# Phantom in production: the only thing listening on the internet (ports 80/443).
+# Caddy gets and renews the Let's Encrypt certificates on its own.
+#
+#   {$PHANTOM_DOMAIN}        -> the api (landing, /app, /studies, /docs, ...)
+#   files.{$PHANTOM_DOMAIN}  -> MinIO, GET/HEAD on the gold bucket only (presigned downloads).
+#                               Bronze, silver and quarantine are never reachable (CLAUDE.md rule 3),
+#                               and neither is the MinIO console.
+(security_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+		Permissions-Policy "camera=(self), microphone=(), geolocation=()"
+		-Server
+	}
+}
+
+{$PHANTOM_DOMAIN} {
+	import security_headers
+	encode zstd gzip
+
+	# The upload route refuses above 200 MB itself (demo.py MAX_UPLOAD_MB); this stops a larger
+	# body at the edge before it reaches the api. A little headroom for the multipart envelope.
+	request_body {
+		max_size 210MB
+	}
+
+	# FastAPI's /docs and /redoc load Swagger/ReDoc from cdn.jsdelivr.net with an inline script,
+	# so they get their own, looser policy. Everything else: self only.
+	@apidocs path /docs /docs/* /redoc /redoc/*
+	header @apidocs Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: https://fastapi.tiangolo.com; frame-ancestors 'none'"
+
+	# 'wasm-unsafe-eval': the vendored MediaPipe hand tracker (WASM). 'unsafe-inline' styles:
+	# React and three.js set style attributes. Gold files come from files.<domain> (presigned
+	# redirects), and GLB textures are decoded through blob: URLs.
+	@app not path /docs /docs/* /redoc /redoc/*
+	header @app Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://files.{$PHANTOM_DOMAIN}; connect-src 'self' blob: data: https://files.{$PHANTOM_DOMAIN}; worker-src 'self' blob:; media-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+
+	reverse_proxy api:8000
+}
+
+files.{$PHANTOM_DOMAIN} {
+	import security_headers
+
+	# The Host header must reach MinIO unchanged: it is part of the presigned signature
+	# (MINIO_PUBLIC_ENDPOINT=files.<domain>). Caddy preserves it by default.
+	@gold {
+		method GET HEAD OPTIONS
+		path /gold/*
+	}
+	handle @gold {
+		reverse_proxy minio:9000
+	}
+	handle {
+		respond "Not found" 404
+	}
+}

@@ -1,0 +1,74 @@
+# Production overlay for the public showcase (see DEPLOY.md). Always used together with the base file:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# What it changes:
+#   - Caddy is the only service with host ports (80/443); postgres, minio and the api lose theirs.
+#   - PHANTOM_PUBLIC=1: visitors can look, only the admin can upload, run or prove (src/api/auth.py).
+#   - Presigned gold URLs are signed for https://files.<domain>, which Caddy proxies to MinIO.
+#   - restart policies, memory limits, log rotation.
+# `!reset` needs Docker Compose v2.24+ (installed by scripts/deploy/setup-server.sh).
+
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
+
+services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports: ["80:80", "443:443", "443:443/udp"]
+    environment:
+      PHANTOM_DOMAIN: "${PHANTOM_DOMAIN:?set PHANTOM_DOMAIN in .env}"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    mem_limit: 256m
+    <<: *logging
+
+  postgres:
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 2g
+    <<: *logging
+
+  minio:
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 2g
+    <<: *logging
+
+  minio-init:
+    <<: *logging
+
+  migrate:
+    <<: *logging
+
+  api:
+    ports: !reset []
+    restart: unless-stopped
+    # --proxy-headers: the login rate limit is per client IP, and behind Caddy every request would
+    # otherwise come from Caddy's address. Trusting any forwarder is safe only because the api has
+    # no host port: Caddy is the one thing that can reach it.
+    command: ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000",
+              "--proxy-headers", "--forwarded-allow-ips", "*"]
+    environment:
+      PHANTOM_PUBLIC: "1"
+      PHANTOM_ADMIN_PASSWORD_HASH: "${PHANTOM_ADMIN_PASSWORD_HASH:?set it with scripts/deploy/setup-server.sh}"
+      PHANTOM_SESSION_SECRET: "${PHANTOM_SESSION_SECRET:?set PHANTOM_SESSION_SECRET in .env}"
+      MINIO_PUBLIC_ENDPOINT: files.${PHANTOM_DOMAIN}
+      MINIO_PUBLIC_SECURE: "true"
+    # S8 (TotalSegmentator) peaks around 8 GB; the Always Free VM has 24 GB.
+    mem_limit: 16g
+    <<: *logging
+
+volumes:
+  caddy_data: {}
+  caddy_config: {}
