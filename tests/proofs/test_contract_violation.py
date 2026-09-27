@@ -1,4 +1,4 @@
-﻿"""TESTING.md Proof 4 -- Contract violation: consumers are protected from upstream schema drift.
+"""TESTING.md Proof 4 -- Contract violation: consumers are protected from upstream schema drift.
 
 Claim: a consumer that pins a contract version rejects data produced under a different
 (incompatible) contract without any code change.
@@ -32,8 +32,6 @@ and that ANY discrepancy raises ContractViolation, not a warning.
 from __future__ import annotations
 
 import copy
-import gzip
-import struct
 
 import numpy as np
 import pytest
@@ -44,7 +42,7 @@ from pipeline.catalog.contracts import VOLUME_CONTRACT_V1_0
 from tests.fixtures.deface_runs import nifti_bytes
 
 # A minimal but valid volume: 4x5x6 float32 with identity affine.
-_ARRAY = (np.arange(4 * 5 * 6, dtype=np.float32).reshape(4, 5, 6) - 100.0)
+_ARRAY = np.arange(4 * 5 * 6, dtype=np.float32).reshape(4, 5, 6) - 100.0
 _IDENTITY = np.eye(4)
 _CONTRACT_V1_0 = VOLUME_CONTRACT_V1_0
 
@@ -204,7 +202,9 @@ def test_contract_violation_is_an_exception_not_a_warning() -> None:
 
     try:
         load(_valid_volume(), lps_contract)
-        raise AssertionError("load did not raise -- ContractViolation must be raised, not swallowed")
+        raise AssertionError(
+            "load did not raise -- ContractViolation must be raised, not swallowed"
+        )
     except ContractViolation:
         pass  # correct: the violation propagates
 

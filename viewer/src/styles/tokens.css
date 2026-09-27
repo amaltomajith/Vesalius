@@ -1,0 +1,88 @@
+/* Phantom design tokens: one look for the whole product (user decision, 2026-09-27: surgical
+   green everywhere). The same values as the landing page (src/api/static/base.css).
+   Light "bone-white" for the dashboard screens; the dark "scan room" for the hologram screens,
+   where the anatomy is the only colour. Group colours belong to the layer system, not the chrome.
+   Fonts: Geist + Geist Mono (OFL, assets/fonts/OFL.txt), bundled: no font request leaves the app. */
+
+@font-face { font-family: "Geist"; src: url("../assets/fonts/Geist-Variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "Geist Mono"; src: url("../assets/fonts/GeistMono-Variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+
+:root {
+  color-scheme: light;
+  --bg: #f3f5f1;
+  --surface: #fbfcfa;
+  --surface-2: #e9eee8;
+  --surface-3: #dce4dc;
+  --mint: #c9f2df;
+  --mint-wash: #e6f7ef;
+  --line: rgb(14 42 34 / 0.1);
+  --line-strong: rgb(14 42 34 / 0.18);
+  --ink: #0e2a22;
+  --ink-2: #35504a;
+  --ink-3: #56696a;
+  --accent: #0f6b52;
+  --accent-deep: #0f3b2f;
+  --accent-soft: rgb(15 107 82 / 0.1);
+  --on-accent: #f3f5f1;
+  --pass: #1f7a4d;
+  --pass-soft: rgb(31 122 77 / 0.1);
+  --reject: #b4382b;
+  --reject-soft: rgb(180 56 43 / 0.09);
+  --shadow: 0 1px 2px rgb(14 42 34 / 0.05), 0 18px 40px -18px rgb(14 42 34 / 0.22);
+  --radius: 10px;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --sans: "Geist", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --mono: "Geist Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+
+  /* the scan room (hologram + full body) */
+  --room-bg: #0a2a21;
+  --room-glow: radial-gradient(70% 60% at 55% 40%, #175a47 0%, #0f3b2f 48%, #0a2a21 100%);
+  --room-ink: #f3f5f1;
+  --room-ink-2: rgb(243 245 241 / 0.7);
+  --room-ink-3: rgb(201 242 223 / 0.45);
+  --room-mint: #c9f2df;
+  --room-panel: rgb(9 37 29 / 0.62);
+  --room-panel-hi: rgb(15 59 47 / 0.8);
+  --room-line: rgb(201 242 223 / 0.16);
+  --room-line-hi: rgb(201 242 223 / 0.32);
+  --room-coral: #ff7a66; /* S7, refusals and frozen state only */
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 15px/1.55 var(--sans);
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, h4 { margin: 0; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; }
+p { margin: 0; }
+a { color: inherit; }
+button { font: inherit; color: inherit; }
+img { max-width: 100%; display: block; }
+.mono { font-family: var(--mono); font-feature-settings: normal; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+:where(a, button, input, select, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px;
+}
+
+/* ---- buttons: full pill ---- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5em;
+  height: 40px; padding: 0 18px; border-radius: 999px;
+  font: 500 14.5px/1 var(--sans); white-space: nowrap; text-decoration: none; cursor: pointer;
+  border: 1px solid var(--line-strong); background: transparent; color: var(--ink);
+  transition: transform 0.2s var(--ease), background-color 0.2s var(--ease), border-color 0.2s var(--ease), color 0.2s var(--ease);
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn:active { transform: translateY(1px) scale(0.985); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+.btn-primary { background: var(--accent-deep); border-color: var(--accent-deep); color: var(--on-accent); box-shadow: 0 8px 20px -10px rgb(15 59 47 / 0.6); }
+.btn-primary:hover { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn-sm { height: 32px; padding: 0 13px; font-size: 13.5px; }
+.btn-mint { background: var(--mint); border-color: var(--mint); color: var(--accent-deep); }
+.btn-mint:hover { background: #dff9ec; border-color: #dff9ec; color: var(--accent-deep); }

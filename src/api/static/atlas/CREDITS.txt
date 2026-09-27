@@ -1,0 +1,11 @@
+Landing page full-body atlas: data credit and licence
+
+Derived from the Z-Anatomy atlas as bundled with the Holoscan viewer:
+  "BodyParts3D - The Database Center for Life Science - CC-BY-SA 2.1 Japan"
+  "Z-Anatomy - The open source atlas of anatomy - CC-BY-SA 4.0"
+
+Changes: surface points sampled from the skeletal, cardiovascular and nervous systems, uniformly
+scaled and moved to line up with a real head CT. Excluded: the visceral system, every kidney and
+ear structure, and every intracranial nervous structure (third-party parts under non-commercial
+or unstated licences). This point cloud (atlas_points.bin / .json) is licensed CC-BY-SA 4.0.
+Built by scripts/build_landing_atlas.py; source file hashes are in atlas_points.json.

@@ -102,7 +102,7 @@ volume.
 
 FastAPI + Pydantic · Dagster (orchestration; fall back to Celery + Redis if it costs too
 much time) · PostgreSQL · MinIO · pydicom · SimpleITK · NumPy · scikit-image · trimesh ·
-pymeshlab · pytesseract · Docker Compose.
+fast-simplification · pytesseract · Docker Compose.
 
 All open source. Do not introduce a paid service.
 

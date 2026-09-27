@@ -1,0 +1,11 @@
+Phantom full-body atlas: credits and licence
+
+The 3D anatomy is the Z-Anatomy atlas, as bundled with the Holoscan viewer:
+  "BodyParts3D - The Database Center for Life Science - CC-BY-SA 2.1 Japan"
+  "Z-Anatomy - The open source atlas of anatomy - CC-BY-SA 4.0"
+  "Cranial Nerves and Foramina - by University of Dundee, CAHID - CC-BY 4.0"
+Structure descriptions: Z-Anatomy's description texts (derived from Wikipedia, CC-BY-SA).
+
+Changes: parts under non-commercial or unstated licences were removed (see EXCLUDED.md); nothing
+else was modified. These files are distributed under CC-BY-SA 4.0 (share-alike).
+Built by scripts/build_atlas.py; source file hashes are in atlas.json.

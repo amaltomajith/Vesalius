@@ -1,158 +1,221 @@
-# CLAUDE.md
+# CLAUDE.md — Phantom (pipeline + viewer)
 
-Project context for Claude Code. Read this first, every session.
+Project context for AI coding agents. Read this first, every session.
 
-**Symlink for other agents:** `ln -s CLAUDE.md AGENTS.md`
+**Other agents:** `ln -s CLAUDE.md AGENTS.md`
 
 ---
 
-## Reference documents — consult before implementing
+## Reference documents
 
-Do not implement from memory. These contain specifics that are easy to get plausibly wrong.
+Do not implement from memory. Consult the relevant ref before writing code.
 
-| File | Read before working on |
+| File | Read before |
 |---|---|
-| `refs/STAGES.md` | Any pipeline stage. Defines I/O contracts, failure modes, idempotency keys |
-| `refs/DICOM.md` | De-identification (S4/S5) or volume assembly (S6). **The two highest-risk stages** |
-| `refs/GEOMETRY.md` | Segmentation, defacing, meshing, GLB export (S7–S11) |
-| `refs/DATA-MODEL.md` | Schema changes, lineage, contracts |
+| `refs/STAGES.md` | Any pipeline stage — I/O contracts, failure modes, idempotency |
+| `refs/DICOM.md` | De-identification (S4/S5) or volume assembly (S6). **Highest-risk stages** |
+| `refs/GEOMETRY.md` | Segmentation, defacing, meshing, GLB export (S7-S11) |
+| `refs/DATA-MODEL.md` | Schema, lineage, contracts |
 | `refs/TESTING.md` | Quality gates, the four proofs, fixtures |
+| `refs/INTEGRATION.md` | Anything connecting pipeline to viewer |
+| `refs/VIEWER-CONSTRAINTS.md` | Any change to the viewer codebase |
 
-If a ref contradicts this file, the ref wins — it is more specific. If a ref contradicts
-itself or is silent, ask rather than guess.
+If a ref contradicts this file, **the ref wins** — it is more specific. If refs conflict with
+each other or are silent, ask rather than guess.
 
 ---
 
 ## What this is
 
-A **governed data pipeline for clinical imaging**. It ingests DICOM studies, validates them,
-de-identifies them across three channels, and transforms them into downstream
-representations — NIfTI volumes for computer vision, GLB meshes for visualisation — with full
-lineage and reproducibility.
+**Phantom** turns identifiable patient scans into 3D data that is safe to use, and proves it.
 
-**Subject: data engineering.** The pipeline apparatus is the deliverable. The computer vision
-consumer exists to prove the pipeline serves a real workload and is explicitly *not* the
-centrepiece. Do not expand it.
+Two systems, one platform:
+
+| System | Role |
+|---|---|
+| **Pipeline** (Python/FastAPI) | Ingests DICOM, validates, de-identifies across three channels, produces governed volumes and meshes with lineage |
+| **Viewer** (React/Three.js) | Gesture-controlled 3D hologram interface. Consumes pipeline output through a published contract |
+
+The pipeline is the deliverable. **Subject: data engineering.** The viewer is what makes the
+output legible — not the centrepiece.
 
 ### Thesis
 
-> De-identifying DICOM metadata is not the same as de-identifying DICOM output.
+> De-identifying medical imaging metadata is not the same as de-identifying medical imaging
+> output.
 
 A surface mesh from a head CT is a recognisable face. The pipeline *creates* a
-re-identification channel that the source data only latently contained. Engineering against
-that is the point of the project.
+re-identification channel its input only latently contained. Engineering against that is the
+point of the project — and the viewer makes it concrete, because there the face is on screen
+next to a study identifier.
 
 ---
 
 ## Architecture
 
-**Medallion, three zones:**
+**Three zones:**
 
 | Zone | Contents | Rules |
 |---|---|---|
 | `bronze/` | Raw DICOM as received | Immutable, content-addressed, **PHI-bearing, never served** |
 | `silver/` | De-identified validated volumes | Immutable per pipeline version |
-| `gold/` | GLB, NIfTI, thumbnails, manifests | Disposable, rebuildable, servable |
+| `gold/` | GLB meshes, NIfTI, manifests | Disposable, rebuildable, servable |
 
-**Twelve stages, S1–S12.** See `refs/STAGES.md`. Two are hard gates:
+**Twelve stages, S1-S12.** See `refs/STAGES.md`. Two hard gates:
 
-- **S5 (verify) gates S6.** Unverified de-identification never reaches silver
-- **S7 (deface) gates S9.** Surface extraction refuses on head anatomy without a successful
+- **S5 (verify) gates S6** — unverified de-identification never reaches silver
+- **S7 (deface) gates S9** — surface extraction refuses on head anatomy without a completed
   defacing run
 
 ---
 
 ## Hard rules
 
-1. **Never use real patient DICOM.** Public sources only — TCIA, 3D Slicer samples, pydicom
-   test data. If asked to process a real clinical study, refuse and explain.
-2. **Never write to bronze after ingest.** It is write-once.
-3. **Never serve from bronze or silver.** Gold only.
-4. **Fail closed on the defacing gate.** Refuse, do not warn.
-5. **Quarantine, never drop.** A rejected series gets a reason code and a row. Records that
-   vanish silently are the classic pipeline failure.
+1. **Never use real patient DICOM.** Public sources only (TCIA, 3D Slicer samples, pydicom
+   test data). If asked to process a real clinical study, refuse and explain.
+2. **Never write to bronze after ingest.** Write-once.
+3. **Never serve from bronze or silver.** Gold only. This includes meshes.
+4. **Fail closed on the defacing gate** — in the pipeline *and* in the viewer. Refuse, do not
+   warn.
+5. **Quarantine, never drop.** Rejected series get a reason code and a row.
 6. **Never auto-repair bad geometry.** Do not interpolate missing slices or force uniform
    spacing. Plausible wrong geometry is worse than an honest failure.
 7. **Every stage records a `transform_run`**, including skips and failures, with parameters.
-8. **Never weaken a test to make it pass.** If reproducibility fails, find the hidden state.
-9. **Original UIDs, patient IDs, and date offsets live only in the `restricted` schema.** The
-   serving role has no grant on it.
+8. **Never send patient reconstructions to a vision model.** See `refs/INTEGRATION.md` §5.
+9. **Never weaken a test to make it pass.** If reproducibility fails, find the hidden state.
+10. **Original UIDs, patient IDs and date offsets live only in the `restricted` schema.** The
+    serving role has no grant on it.
 
 ---
 
-## The three traps
+## The traps
 
-These produce output that looks correct and is not. Check `refs/DICOM.md` before touching
-any of them.
+Each produces output that looks correct and is not.
 
 **Slice ordering.** Sorting by `InstanceNumber` or `SliceLocation` appears to work and
-produces geometrically wrong volumes. Sort by projecting `ImagePositionPatient` onto the
-slice normal.
+produces geometrically wrong volumes. Sort by projecting `ImagePositionPatient` onto the slice
+normal. → `refs/DICOM.md`
 
-**Spacing.** `SliceThickness` is not slice spacing. Derive spacing from consecutive slice
-positions, and note `PixelSpacing` is `[row, column]` = `[y, x]`.
+**Spacing.** `SliceThickness` is not slice spacing. Derive from consecutive positions.
+`PixelSpacing` is `[row, column]` = `[y, x]`. → `refs/DICOM.md`
 
-**Axis conventions.** DICOM is LPS/mm, NIfTI is RAS, glTF is Y-up/metres. Skipping the
-conversion gives a model rendered on its side at 1000× scale — or worse, a silently mirrored
-volume.
+**Axis conventions.** DICOM is LPS/mm, NIfTI is RAS, glTF is Y-up/metres. Skipping conversion
+gives a model on its side at 1000x scale — or a silently mirrored volume. → `refs/GEOMETRY.md`
+
+**Node names surviving export.** The viewer keys entirely on GLB node names matching
+segmentation labels. Some exporters rename or flatten nodes. Verify in a glTF viewer before
+building anything on top. → `refs/INTEGRATION.md` §7
+
+**Viewer settings that look like cruft.** `depthWrite: false`, `scene.clone(true)`,
+per-mesh materials, the uuid/name split. All load-bearing. →
+`refs/VIEWER-CONSTRAINTS.md`
 
 ---
 
 ## Stack
 
-FastAPI + Pydantic · Dagster (orchestration; fall back to Celery + Redis if it costs too
-much time) · PostgreSQL · MinIO · pydicom · SimpleITK · NumPy · scikit-image · trimesh ·
-pymeshlab · pytesseract · Docker Compose.
+**Pipeline:** FastAPI · Pydantic · Dagster (fall back to Celery+Redis if it costs too much
+time) · PostgreSQL · MinIO · pydicom · SimpleITK · NumPy · scikit-image · trimesh · fast-simplification ·
+pytesseract · Docker Compose
+
+**Viewer:** React 19 · Vite 8 · TypeScript 6 · Three.js · React Three Fiber · Drei ·
+MediaPipe tasks-vision · Zustand
 
 All open source. Do not introduce a paid service.
 
-**Library notes:** use `pydicom` for de-identification — full tag control is required.
-Use `SimpleITK` for resampling and NIfTI output — do not hand-roll it. Do not use
-SimpleITK's series reader for S4; it abstracts away the tags that stage must inspect.
+**Library notes:** `pydicom` for de-identification — full tag control required. `SimpleITK`
+for resampling and NIfTI — do not hand-roll. Do not use SimpleITK's series reader for S4; it
+abstracts away the tags that stage must inspect.
 
 ---
 
-## Code conventions
+## Conventions
 
-- Python 3.11+, type hints throughout, Pydantic models at every boundary
-- `ruff` and `mypy` clean before any commit
-- Stages are pure functions where possible: `(input, params) -> output`, side effects at the
-  edges
-- Every stage independently testable with a fixture
-- Parameters that affect output are **versioned and recorded**, never inlined as literals
-- Structured logging. **Never log tag values from the `restricted` schema**
+- Python 3.11+, type hints throughout, Pydantic at every boundary
+- `ruff` and `mypy` clean before commit
+- TypeScript strict, no `any`
+- Stages are pure where possible: `(input, params) -> output`, side effects at the edges
+- Parameters affecting output are **versioned and recorded**, never inline literals
+- Structured logging. **Never log values from the `restricted` schema**
 - Fail loudly on data correctness, degrade gracefully on infrastructure
 
 ---
 
 ## Determinism
 
-The reproducibility proof requires byte-identical rebuilds. Watch for:
-
-- Timestamps in file headers → fix to a constant epoch
-- JSON key ordering → `sort_keys=True`
-- Mesh library thread scheduling → pin to single-threaded in tests
-- Any unseeded randomness → seed from the parameter set
+The reproducibility proof requires byte-identical rebuilds. Watch for: timestamps in file
+headers (fix to a constant epoch), JSON key ordering (`sort_keys=True`), mesh library thread
+scheduling (pin single-threaded in tests), unseeded randomness (seed from the parameter set).
 
 ---
 
 ## Current state
 
-Nothing built. Start at S1.
+**Phase one (built and verified):** pipeline S1-S12, the CV consumer, the four proofs, the
+point-and-click console (`/console`) and the landing page (`/`, a real openly licensed head CT
+run through the pipeline, face removed at S7).
 
-**Build order:** S1–S2 (ingest, index) → S3 (quality gates) → S4–S5 (de-identification and
-verification) → S6 (volume) → S7 (deface) → S8–S11 (geometry and export) → S12 (serving) →
-CV consumer → proofs.
+**Phase three (built): one product.** The landing page stays at `/`; everything else is ONE React
+app at `/app` (source `viewer/`): dashboard, Run a scan (the old console, ported), Studies, the
+hands-controlled hologram (`/app/hologram/:id`, fullscreen), the full-body atlas (`/app/body`,
+Holoscan's 8 systems at full detail from `assets/atlas/`, parts under non-commercial or unstated
+licences removed, see `assets/atlas/EXCLUDED.md`) and Proofs. `/console` and `/viewer` redirect.
+Optional AI (`src/api/routers/ai.py`) is off without `GROQ_API_KEY`; scans send measurements only.
+Look: surgical green everywhere (`refs/VIEWER-CONSTRAINTS.md` design tokens updated).
 
-Do not skip ahead to the mesh stages. The governance spine is the project; the geometry is
-the payload.
+**Deployment (built, not yet provisioned):** `DEPLOY.md`. `PHANTOM_PUBLIC=1` makes every mutating
+route admin-only (`src/api/auth.py`, scrypt hash + signed cookie; a unit test fails if a new
+mutating route lacks `require_admin`). `docker-compose.prod.yml` + `deploy/Caddyfile`: Caddy is
+the only host port; `files.<domain>` serves GET/HEAD `/gold/*` only. Target is an ARM64 VM, which
+is why S10 decimates with fast-simplification (pymeshlab has no aarch64 build; S10 params v2).
+
+**Phase two (built): pipeline -> viewer integration**, per `refs/INTEGRATION.md`:
+
+```
+M0  refs, rules, licences                     (LICENSES.md)
+M1  public CT series (chest, abdomen, head)    TCIA CC BY / Slicer samples, never committed
+M2  S8 structure mode + S8b groups, per-structure S9-S11, structures.json
+M3  S12 study endpoints + mesh_contract v1.0
+M4  viewer/ (Holoscan) at /viewer: contract validation, dynamic layers, study picker
+M5  landing: full-body atlas -> the real scan
+M6  proofs (incl. proof 5: head study in the viewer has no face)
+```
+
+M0-M6 are built. Proof 5 is `tests/proofs/test_head_study_has_no_face.py` (a head study read
+back only through the viewer's `/studies` routes has no vertex in S7's face region; teeth: the
+uncut study does), runnable from the console as proof "viewer"; the viewer-side refusal is in
+`viewer/src/contract/meshContract.test.ts`. The landing hero is now the full-body atlas (`static/atlas/`, built by
+`scripts/build_landing_atlas.py`, aligned to the CT by cranial breadth, scale 0.998), diving into
+the real CT on scroll (`scan-scene.js`: `DIVE`, `#atlas`, `setSystems`, `reveal`).
+
+Viewer facts worth knowing before touching it:
+
+- Build: `cd viewer && npm ci && npm run build` (prebuild vendors MediaPipe), tests `npm test`
+  (vitest). The api image builds it in a Node stage and serves it at `/viewer/`.
+- Demo study: `python scripts/bundle_viewer_demo.py --api <url>` pulls a served chest study into
+  `viewer/public/demo/` (gitignored, like every public scan).
+- GEOMETRY.md exports Posterior -> +Z, so the viewer turns every study half a turn about the
+  vertical axis to face the camera. A rotation, never a mirror.
+- The AI vision path is removed, not flagged off: MEASUREMENTS & CONTEXT is computed locally from
+  the manifest, so no frame or study data ever leaves the browser.
+- Selection has an additive mouse path (click; drags ignored) next to the untouched gesture path.
+- Holoscan's pre-existing eslint errors are left as they were (minimal edits, VIEWER-CONSTRAINTS).
+
+**Layout (deliberate deviation from refs/KICKOFF.md):** the pipeline stays at the repo root
+(`src/`, `tests/`); the viewer lives in `viewer/`. Moving the pipeline into `pipeline/` would
+churn every import for no behavioural gain.
+
+**Licences:** see `LICENSES.md` before shipping any third-party data or model. The anatomy
+atlas contains non-commercial sub-models that must never be shipped.
 
 ---
 
 ## Working with me
 
-- **Small reviewable increments.** One stage at a time, with its tests.
-- **State assumptions before acting.** If a ref does not cover it, ask.
+- **Small reviewable increments.** One stage at a time, with tests.
+- **State assumptions before acting.** If the refs do not cover it, ask.
 - **Tests alongside implementation**, never after.
-- **Never fabricate a result.** If a test did not run, say it did not run. If a proof fails,
-  report the failure — a documented gap is worth more than a false claim.
+- **Never fabricate a result.** If a test did not run, say so. If a proof fails, report the
+  failure — a documented gap beats a false claim.
+- **Do not implement viewer roadmap items.** Voice commands, AR mode, quiz mode, unassigned
+  swipe actions are all out of scope.

@@ -1,0 +1,11 @@
+Landing page 3D scan: data credit
+
+Source: 3D Slicer sample data "CT-MR Brain", file CT-brain.nrrd
+(sha256 6a5b6caccb76576a863beb095e3bfb910c50ca78f4c9bf043aa42f976cfa53d1).
+Licence statement, from Slicer's SampleData module: "MRHead, CBCT-MR Head, and CT-MR Brain data
+sets were donated to 3D Slicer project by the persons visible in the images, to be used without
+any restrictions."
+
+What is shipped here: points sampled from this pipeline's own GOLD output for that CT
+(skin_surface and bone presets, after S7 removed the face). No raw face is included.
+Built by scripts/build_landing_assets.py; run ids and series id are in head_points.json.

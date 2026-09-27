@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     # compose the internal `minio:9000` is unreachable from a client, so S12 signs for this one.
     # Empty = same as `minio_endpoint`.
     minio_public_endpoint: str = ""
+    # the public endpoint's scheme (deployment: https via Caddy); None = same as minio_secure
+    minio_public_secure: bool | None = None
     presign_expiry_seconds: int = 300
 
     minio_bronze_bucket: str = "bronze"

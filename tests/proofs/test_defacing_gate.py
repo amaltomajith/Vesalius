@@ -1,4 +1,4 @@
-﻿"""TESTING.md Proof 2 -- Defacing gate: the pipeline cannot emit an identifying face mesh.
+"""TESTING.md Proof 2 -- Defacing gate: the pipeline cannot emit an identifying face mesh.
 
 Two assertions from the spec:
 
@@ -65,9 +65,7 @@ def _base_facts(*, required: bool) -> GateFacts:
         "applied": required,
         "decision": {"reason": reason},
         "output": (
-            {"volume_defaced": {"sha256": _DEF.sha256}}
-            if required
-            else {"volume_defaced": None}
+            {"volume_defaced": {"sha256": _DEF.sha256}} if required else {"volume_defaced": None}
         ),
     }
     return GateFacts(

@@ -47,7 +47,11 @@ def gold_presign_client(settings: Settings) -> Minio:
         settings.minio_public_endpoint or settings.minio_endpoint,
         access_key=settings.minio_gold_access_key,
         secret_key=settings.minio_gold_secret_key,
-        secure=settings.minio_secure,
+        secure=(
+            settings.minio_public_secure
+            if settings.minio_public_secure is not None
+            else settings.minio_secure
+        ),
         region="us-east-1",
     )
 

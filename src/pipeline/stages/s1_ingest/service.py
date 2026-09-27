@@ -21,7 +21,13 @@ from minio import Minio
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from pipeline.catalog.idempotency import StageContext, StageOutcome, record_skip, run_stage
+from pipeline.catalog.idempotency import (
+    StageContext,
+    StageOutcome,
+    existing_successful_run,
+    record_skip,
+    run_stage,
+)
 from pipeline.catalog.models import IngestBatch, Quarantine, TransformRun
 from pipeline.common.config import Settings
 from pipeline.common.errors import QuarantineError, ZeroDicomFoundError
@@ -100,6 +106,27 @@ def ingest(
     source: str,
     path: str,
 ) -> IngestBatchResult:
+    lookup_ctx = StageContext(
+        stage=STAGE,
+        stage_version=STAGE_VERSION,
+        subject_type="batch",
+        subject_id=uuid4(),
+        input_hashes=[],
+        params={"source": source, "path": path},
+    )
+    prior_run = existing_successful_run(session, lookup_ctx)
+    if prior_run is not None:
+        prior_batch = session.get(IngestBatch, prior_run.subject_id)
+        if prior_batch is not None:
+            return IngestBatchResult(
+                batch_id=prior_batch.id,
+                source=prior_batch.source,
+                file_count=prior_batch.file_count,
+                bytes_total=prior_batch.bytes_total,
+                files=[],
+                non_dicom_skipped=0,
+            )
+
     batch_id = uuid4()
     batch = IngestBatch(
         id=batch_id,

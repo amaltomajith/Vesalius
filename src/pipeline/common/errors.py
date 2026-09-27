@@ -466,3 +466,49 @@ class ExportOutputMismatchError(QuarantineError):
         super().__init__(
             "S11_OUTPUT_MISMATCH", detail, "persisted gold artifact != in-memory result"
         )
+
+
+# ---- S8-S11 structures mode (refs/INTEGRATION.md §2) -------------------------------------------
+
+
+class SegmentationEngineError(PipelineError):
+    """The segmentation engine is missing, not the pinned version, or cannot be configured to run
+    without telemetry. An infrastructure failure, not a verdict on the series: the run is recorded
+    as failed and nothing is quarantined."""
+
+
+class StructuresEmptyError(QuarantineError):
+    """The anatomical segmentation found no structures at all in this volume."""
+
+    def __init__(self, detail: dict[str, object]) -> None:
+        super().__init__("S8_STRUCTURES_EMPTY", detail, "no anatomical structures found")
+
+
+class StructuresGeometryMismatchError(QuarantineError):
+    """The engine's label volume is not on the gated volume's exact voxel grid."""
+
+    def __init__(self, detail: dict[str, object]) -> None:
+        super().__init__(
+            "S8_STRUCTURES_GEOMETRY_MISMATCH", detail, "label volume is off the volume's grid"
+        )
+
+
+class StructuresNoneMeshedError(QuarantineError):
+    """Not one structure produced a surface: nothing to publish."""
+
+    def __init__(self, detail: dict[str, object]) -> None:
+        super().__init__("S9_STRUCTURES_NONE_MESHED", detail, "no structure produced a surface")
+
+
+TAMPER_CODES = {
+    "S9": "S9_STRUCTURES_INPUT_TAMPERED",
+    "S10": "S10_STRUCTURES_INPUT_TAMPERED",
+    "S11": "S11_STRUCTURES_INPUT_TAMPERED",
+}
+
+
+class StructuresInputTamperedError(QuarantineError):
+    """A structures-mode silver artifact no longer hashes to what the catalog recorded."""
+
+    def __init__(self, stage: str, detail: dict[str, object]) -> None:
+        super().__init__(TAMPER_CODES[stage], detail, "silver input differs from catalog")

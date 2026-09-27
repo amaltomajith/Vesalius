@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from minio import Minio
 from sqlalchemy.orm import Session
 
+from api.auth import require_admin
 from api.dependencies import (
     bronze_client_dependency,
     pipeline_session_dependency,
@@ -26,7 +27,7 @@ from pipeline.stages.s1_ingest.service import ingest
 router = APIRouter()
 
 
-@router.post("/ingest", response_model=IngestBatchResult)
+@router.post("/ingest", response_model=IngestBatchResult, dependencies=[Depends(require_admin)])
 def ingest_archive(
     source: str,
     file: UploadFile,

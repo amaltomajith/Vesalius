@@ -8,11 +8,22 @@ of it are independently written per stage.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 
 import numpy as np
 import pytesseract
 from PIL import Image
+
+# On Windows the installer (UB-Mannheim) puts tesseract at a fixed path that may not be
+# in PATH in the current shell session.  Set PYTESSERACT_PATH in .env to point directly
+# at the binary -- pytesseract will use it and won't try to look up PATH at all.
+_tess_path = os.environ.get("PYTESSERACT_PATH") or os.environ.get(
+    "TESSERACT_CMD",
+    r"C:\Program Files\Tesseract-OCR\tesseract.exe" if os.name == "nt" else "tesseract",
+)
+if os.path.isfile(_tess_path):
+    pytesseract.pytesseract.tesseract_cmd = _tess_path
 
 
 @dataclass(frozen=True)

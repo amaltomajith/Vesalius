@@ -33,7 +33,9 @@ from pipeline.stages.s3_quality_gate.models import QualityGateBatchResult, Quali
 STAGE = "S3"
 STAGE_VERSION = "1.0.0"
 # "2": closed body-part vocabulary -- forces re-evaluation of series gated under "1"
-CHECKS_VERSION = "2"
+# "3": JPEG Lossless / JPEG 2000 pixel data can now be decoded, so series refused under "2" with
+# QG_PIXEL_DECODE_FAILED for want of a decoder must be re-evaluated
+CHECKS_VERSION = "3"
 
 
 def _maybe_infer_body_part(series: Series, geoms: list[InstanceGeometry]) -> None:
@@ -83,6 +85,17 @@ def _evaluate_series(
     return failures
 
 
+def _gate_params(series: Series) -> dict[str, object]:
+    """The parameters that key this run. A body part stated by a person changes the verdict for
+    the very same files, so it is part of the key: without it, re-uploading a scan that was
+    refused as unlabelled -- now with its body part stated -- would be answered from the earlier
+    refusal. Added ONLY when stated, so every other series keeps the key it always had."""
+    params: dict[str, object] = {"checks_version": CHECKS_VERSION}
+    if series.study.body_part_source == "declared":
+        params["body_part_declared"] = series.study.body_part
+    return params
+
+
 def quality_gate_series(
     session: Session, minio_client: Minio, settings: Settings, series_id: UUID
 ) -> QualityGateSeriesResult:
@@ -97,7 +110,7 @@ def quality_gate_series(
         subject_type="series",
         subject_id=series_id,
         input_hashes=instance_hashes,
-        params={"checks_version": CHECKS_VERSION},
+        params=_gate_params(series),
     )
 
     result_holder: dict[str, list[GateFailure]] = {}

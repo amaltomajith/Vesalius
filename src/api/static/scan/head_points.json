@@ -1,0 +1,33 @@
+{
+  "bytes": 3600000,
+  "bytes_per_point": 12,
+  "count": 300000,
+  "counts": {
+    "bone": 200000,
+    "skin": 100000
+  },
+  "extent_m": 0.09913721680641174,
+  "layout": "int16 xyz[count] (x extent_m / 32767) | int8 normal xyz[count] (/ 127) | uint8 tissue[count] (0 skin, 1 bone) | uint16 slice[count]",
+  "provenance": {
+    "runs": {
+      "bone": {
+        "contract": "1.0",
+        "run_id": "0a0dbcb8e397",
+        "series_id": "5dc1438a-db6f-49b6-935d-a5e35426febe"
+      },
+      "skin_surface": {
+        "contract": "1.0",
+        "run_id": "4cc9fe62e08c",
+        "series_id": "5dc1438a-db6f-49b6-935d-a5e35426febe"
+      }
+    },
+    "source": "3D Slicer sample data CT-MR Brain, CT-brain.nrrd",
+    "source_sha256": "6a5b6caccb76576a863beb095e3bfb910c50ca78f4c9bf043aa42f976cfa53d1"
+  },
+  "slice_normal_gltf": [
+    0.012746542089959807,
+    0.9883584567491083,
+    0.15160833300735807
+  ],
+  "slices": 69
+}

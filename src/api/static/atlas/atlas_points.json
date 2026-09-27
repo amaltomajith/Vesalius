@@ -1,0 +1,76 @@
+{
+  "alignment": {
+    "atlas_cranium": {
+      "breadth": 0.1463849997694241,
+      "vertex_y": 1.7053854406782687
+    },
+    "band_below_vertex_m": [
+      0.03,
+      0.1
+    ],
+    "ct_cranium": {
+      "breadth": 0.1460660589306298,
+      "vertex_y": 0.0770357925450867
+    },
+    "nerves_below_y_m": -0.07526096081915544,
+    "scale": 0.99782
+  },
+  "bounds_m": [
+    [
+      -0.3304,
+      -1.6209,
+      -0.142
+    ],
+    [
+      0.3361,
+      0.077,
+      0.1067
+    ]
+  ],
+  "bytes": 2798800,
+  "bytes_per_point": 10,
+  "count": 279880,
+  "excluded": "visceral system; kidney/ear nodes; all intracranial nervous points",
+  "extent_m": 1.6209262966394073,
+  "frame": "the head CT cloud's (scan/head_points.json): glTF metres, Y up, anterior -Z",
+  "layout": "int16 xyz[count] (x extent_m / 32767) | int8 normal xyz[count] (/ 127) | uint8 system[count]",
+  "licence": "CC-BY-SA 4.0 (derived from Z-Anatomy / BodyParts3D); see CREDITS.txt",
+  "sources": {
+    "nerves": {
+      "file": "NervousSystem100.glb",
+      "points": 19880,
+      "sha256": "d1a0efd34e3d37a5c437bb4dc64dc6c43b7b44636d750ab7ec9c329c62b04b38",
+      "skipped": {
+        "intracranial_points": 44120,
+        "licence": 32,
+        "outside_body": 0,
+        "overlay": 110
+      }
+    },
+    "skeleton": {
+      "file": "SkeletalSystem100.glb",
+      "points": 180000,
+      "sha256": "6c865539508c78f70eda228a641d97f9df517cf09502c020acc3bbb221b977e9",
+      "skipped": {
+        "licence": 52,
+        "outside_body": 0,
+        "overlay": 1463
+      }
+    },
+    "vessels": {
+      "file": "CardioVascular41.glb",
+      "points": 80000,
+      "sha256": "be9a05921e7beda7dbca26f18f69b72e3288b5267fd17c2c9cffd68f1089f743",
+      "skipped": {
+        "licence": 16,
+        "outside_body": 0,
+        "overlay": 0
+      }
+    }
+  },
+  "systems": [
+    "skeleton",
+    "vessels",
+    "nerves"
+  ]
+}
