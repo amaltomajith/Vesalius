@@ -78,3 +78,4 @@ CC-BY-SA. `tests/unit/test_atlas_assets.py` checks the exclusions on the shipped
 | Geist, Geist Mono (app copy) | OFL-1.1 | `viewer/src/assets/fonts/`, bundled into the app build |
 | Groq API (optional AI explanations) | external service, off by default | used only when `GROQ_API_KEY` is set on the server; scans send measurements only (CLAUDE.md rule 8) |
 | Vitest (dev only) | MIT | `viewer/package.json` devDependencies |
+| MinIO server `RELEASE.2025-10-15T17-29-55Z`, MinIO client `RELEASE.2025-08-13T08-35-41Z` | AGPL-3.0 | built unmodified from the upstream tags by `docker/minio/Dockerfile` (upstream stopped publishing images and archived both repositories); the source is the public tag, so no change of ours needs offering |

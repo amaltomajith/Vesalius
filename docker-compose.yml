@@ -20,7 +20,11 @@ services:
     ports: ["127.0.0.1:5433:5432"]
 
   minio:
-    image: quay.io/minio/minio
+    # built from MinIO's final upstream release (docker/minio/Dockerfile): its own images are gone
+    build: &minio_build
+      context: ./docker
+      dockerfile: minio/Dockerfile
+    image: &minio_image vesalius-minio:RELEASE.2025-10-15T17-29-55Z
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD_FILE: /run/secrets/minio_root_password
@@ -36,7 +40,9 @@ services:
     ports: ["127.0.0.1:9000:9000", "127.0.0.1:9001:9001"]
 
   minio-init:
-    build: ./docker/minio-init
+    build: *minio_build
+    image: *minio_image
+    entrypoint: ["/bin/sh", "/create-buckets.sh"]
     depends_on:
       minio:
         condition: service_healthy

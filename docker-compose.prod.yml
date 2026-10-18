@@ -52,12 +52,15 @@ services:
     <<: *logging
 
   migrate:
+    # the same pulled api image: without this the base file's `build:` would build the api image
+    # again on the server, under another name
+    image: &api_image "${VESALIUS_IMAGE:?set VESALIUS_IMAGE in .env, e.g. ghcr.io/<you>/vesalius-api}:${VESALIUS_TAG:-latest}"
     <<: *logging
 
   api:
     # the arm64 image CI builds on GitHub's free arm64 runners (.github/workflows/ci.yml, job
     # `image`); scripts/deploy/deploy.sh pulls it (or builds it here with --build: 2 A1 cores are slow)
-    image: "${VESALIUS_IMAGE:?set VESALIUS_IMAGE in .env, e.g. ghcr.io/<you>/vesalius-api}:${VESALIUS_TAG:-latest}"
+    image: *api_image
     ports: !reset []
     restart: unless-stopped
     # --proxy-headers: the login rate limit is per client IP, and behind Caddy every request would

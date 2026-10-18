@@ -75,3 +75,30 @@ def test_the_app_host_has_a_content_security_policy_and_hsts() -> None:
     assert "Strict-Transport-Security" in caddy
     assert "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'" in caddy
     assert "frame-ancestors 'none'" in caddy
+
+
+# MinIO stopped publishing images in October 2025: `quay.io/minio/*` now needs a login, so a fresh
+# machine (CI, the server) could not pull the unpinned `latest` that a cached copy hid locally.
+GONE_REGISTRIES = ("quay.io/minio/", "minio/minio", "minio/mc")
+
+
+def _pinned(image: str) -> bool:
+    name, _, tag = image.rpartition(":")
+    return bool(name) and "/" not in tag and tag not in ("", "latest")
+
+
+def test_every_image_is_built_here_or_pinned_to_a_release() -> None:
+    base = yaml.safe_load((ROOT / "docker-compose.yml").read_text(encoding="utf-8"))["services"]
+    prod = _prod()["services"]
+    for name in {*base, *prod}:
+        spec = {**base.get(name, {}), **prod.get(name, {})}
+        image = str(spec.get("image", ""))
+        assert not image.startswith(GONE_REGISTRIES), f"{name}: {image} can no longer be pulled"
+        if "build" not in spec:
+            assert _pinned(image), f"{name}: pulled image {image!r} needs a non-latest tag"
+    for dockerfile in (ROOT / "docker").rglob("Dockerfile"):
+        for line in dockerfile.read_text(encoding="utf-8").splitlines():
+            if line.startswith("FROM "):
+                image = line.split()[1]
+                assert not image.startswith(GONE_REGISTRIES), f"{dockerfile}: {image}"
+                assert _pinned(image), f"{dockerfile}: base image {image!r} needs an explicit tag"

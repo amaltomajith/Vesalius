@@ -543,8 +543,9 @@ torch 2.14 CPU. S8 and S10 timings on A1 cores are **unmeasured** until the firs
 - **Line endings:** shell scripts must be LF (`.gitattributes`); a CRLF entrypoint breaks the
   container.
 - **Scripting:** Bash heredocs on Windows mangle `\n` and quotes, so write scripts to files.
-- **Images:** MinIO images come from `quay.io/minio/*`. The minio image has no `tar`, so use
-  `docker compose cp`.
+- **Images:** MinIO is built from its final upstream source release (`docker/minio/Dockerfile`,
+  image `vesalius-minio:<release>`, shared by `minio` and `minio-init`): `quay.io/minio/*` needs a
+  login since MinIO stopped publishing images. Copy files out with `docker compose cp`.
 - **Tests and the database:** the dev database holds rows from earlier runs, so tests must scope
   assertions to their own ids.
 - **FastAPI 0.141** wraps included routers in `_IncludedRouter`, so route walks must recurse into

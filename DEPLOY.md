@@ -112,8 +112,10 @@ bash scripts/deploy/deploy.sh --studies
 
 The first run:
 - **Asks for the admin password** (12+ characters). Only its hash goes into `.env`.
-- **Pulls the arm64 image** CI built (`docker pull`, a few minutes). Nothing is built on the VM;
-  `--build` builds here instead, if CI is ever unavailable (slow on 2 cores).
+- **Pulls the arm64 image** CI built (`docker pull`, a few minutes). `--build` builds it here
+  instead, if CI is ever unavailable (slow on 2 cores).
+- **Builds the MinIO image once**, from MinIO's final upstream release (`docker/minio/Dockerfile`):
+  MinIO no longer publishes images. A few minutes; CI proves the same build on arm64.
 - **Starts the stack and loads the three public CT studies** (head, chest, abdomen). That downloads
   the scans and the segmentation model and segments one study at a time.
   - It is unmeasured on 2 A1 cores: allow an hour, and write the real time here after the first run.
