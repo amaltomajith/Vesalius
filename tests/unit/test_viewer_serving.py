@@ -128,8 +128,15 @@ def test_a_patient_study_can_never_send_an_image() -> None:
     panel = (VIEWER_SRC / "components" / "AiInsight.tsx").read_text(encoding="utf-8")
     assert "kind: 'study'; node: string; label: string; studyId: string; snapshot: null" in panel
     hologram = (VIEWER_SRC / "screens" / "Hologram.tsx").read_text(encoding="utf-8")
-    # the snapshot is kept for the atlas only
-    assert "if (atlasRef.current) setSnapshot(frame);" in hologram
+    # the snapshot is decided before any pixel is read (lib/snapshot.ts, since the AI snapshot
+    # gesture moved into the gesture engine): not the atlas means no capture, and the frame is only
+    # read after that decision allowed it
+    decide = hologram.index("const d = decideSnapshot(atlasRef.current")
+    refuse = hologram.index("if (!d.capture) { say(d.message); return; }")
+    read = hologram.index("setSnapshot(capture());")
+    assert decide < refuse < read
+    rule = (VIEWER_SRC / "lib" / "snapshot.ts").read_text(encoding="utf-8")
+    assert "if (!atlas) return { capture: false" in rule
     assert "snapshot={atlas ? snapshot : null}" in hologram
 
 

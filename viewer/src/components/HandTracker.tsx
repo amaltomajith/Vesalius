@@ -1,4 +1,5 @@
 import { useRef, useEffect, useCallback } from 'react';
+import { initialLock, lockStep } from '../hooks/operatorLock';
 
 // Landmark index constants
 const HAND_CONNECTIONS: [number, number][] = [
@@ -26,21 +27,27 @@ export interface NormalizedLandmark {
 }
 
 export interface HandTrackerProps {
-  /** Called every frame with up to 2 hands of landmarks (or null if none) */
+  /** Called every frame with up to 2 hands of landmarks (or null if none): the operator's, when
+   *  more people are in view (hooks/operatorLock.ts) */
   onHandsUpdate: (hands: NormalizedLandmark[][] | null, handedness?: string[]) => void;
+  /** how many other people's hands are being ignored (0 when the operator is alone) */
+  onIgnored?: (count: number) => void;
   /** camera state, for the HUD: starting -> on | blocked | unavailable */
   onStatus?: (status: CameraStatus) => void;
 }
 
 export type CameraStatus = 'starting' | 'on' | 'blocked' | 'unavailable';
 
-export default function HandTracker({ onHandsUpdate, onStatus }: HandTrackerProps) {
+export default function HandTracker({ onHandsUpdate, onStatus, onIgnored }: HandTrackerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const landmarkerRef = useRef<any>(null);
   const lastVideoTimeRef = useRef(-1);
   const animFrameRef = useRef<number>(0);
   const activeRef = useRef(true);
+  // whose hands to follow when others are in view (nearest, then follow; user decision 2026-10-18)
+  const lockRef = useRef(initialLock());
+  const ignoredRef = useRef(0);
 
   // Resize canvas on window resize
   useEffect(() => {
@@ -58,11 +65,26 @@ export default function HandTracker({ onHandsUpdate, onStatus }: HandTrackerProp
     ctx: CanvasRenderingContext2D,
     handsLandmarks: NormalizedLandmark[][],
     w: number,
-    h: number
+    h: number,
+    kept: number[],
   ) => {
     ctx.clearRect(0, 0, w, h);
 
-    handsLandmarks.forEach((landmarks, handIdx) => {
+    handsLandmarks.forEach((landmarks, idx0) => {
+      // everyone else's hands: a faint grey outline, so it is visible whose hands are followed
+      if (!kept.includes(idx0)) {
+        ctx.strokeStyle = 'rgba(138, 154, 148, 0.35)';
+        ctx.lineWidth = 1.5;
+        ctx.lineCap = 'round';
+        for (const [a, b] of HAND_CONNECTIONS) {
+          ctx.beginPath();
+          ctx.moveTo((1 - landmarks[a].x) * w, landmarks[a].y * h);
+          ctx.lineTo((1 - landmarks[b].x) * w, landmarks[b].y * h);
+          ctx.stroke();
+        }
+        return;
+      }
+      const handIdx = kept.indexOf(idx0);
       const handColor = handIdx === 0 ? '#c9f2df' : '#9fd8ff';
       const tipColor = handIdx === 0 ? '#7ee2b3' : '#ffb59f';
 
@@ -154,7 +176,7 @@ export default function HandTracker({ onHandsUpdate, onStatus }: HandTrackerProp
             modelAssetPath: `${import.meta.env.BASE_URL}mediapipe/hand_landmarker.task`, // vendored, hash-pinned
             delegate: 'GPU',
           },
-          numHands: 2,
+          numHands: 4, // the operator's two plus others in view: operatorLock keeps the operator's
           runningMode: 'VIDEO',
           minHandDetectionConfidence: 0.6,
           minHandPresenceConfidence: 0.6,
@@ -187,12 +209,18 @@ export default function HandTracker({ onHandsUpdate, onStatus }: HandTrackerProp
               const w = canvas.width;
               const h = canvas.height;
 
-              if (results.landmarks && results.landmarks.length > 0) {
-                drawHands(ctx, results.landmarks, w, h);
-                const handedness = results.handedness ? results.handedness.map((h: any) => h[0]?.categoryName || h[0]?.displayName || '') : [];
-                onHandsUpdate(results.landmarks, handedness);
+              const all: NormalizedLandmark[][] = results.landmarks ?? [];
+              const handedness: string[] = results.handedness
+                ? results.handedness.map((h: { categoryName?: string; displayName?: string }[]) => h[0]?.categoryName || h[0]?.displayName || '')
+                : [];
+              const lock = lockStep(lockRef.current, all.map((lms, i) => ({ lms, label: handedness[i] })), performance.now());
+              lockRef.current = lock.state;
+              if (lock.ignored !== ignoredRef.current) { ignoredRef.current = lock.ignored; onIgnored?.(lock.ignored); }
+              if (lock.keep.length > 0) {
+                drawHands(ctx, all, w, h, lock.keep);
+                onHandsUpdate(lock.keep.map((k) => all[k]), lock.keep.map((k) => handedness[k]));
               } else {
-                ctx.clearRect(0, 0, w, h);
+                if (all.length > 0) drawHands(ctx, all, w, h, []); else ctx.clearRect(0, 0, w, h);
                 onHandsUpdate(null);
               }
             } catch (e) {
@@ -224,7 +252,7 @@ export default function HandTracker({ onHandsUpdate, onStatus }: HandTrackerProp
       video.srcObject = null;
       onHandsUpdate(null);
     };
-  }, [drawHands, onHandsUpdate, onStatus]);
+  }, [drawHands, onHandsUpdate, onStatus, onIgnored]);
 
   return (
     <>

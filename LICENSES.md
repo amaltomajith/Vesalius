@@ -46,12 +46,14 @@ Derived works must be distributed under the same licence (share-alike).
 "Cranial Nerves and Foramina" (University of Dundee, CAHID) is CC-BY 4.0 and may ship with
 attribution.
 
-**What ships:** `src/api/static/atlas/` (landing page): a point cloud sampled from the skeletal,
-cardiovascular and nervous GLBs by `scripts/build_landing_atlas.py`, licensed CC-BY-SA 4.0 with
-`atlas/CREDITS.txt` and a footer credit. Exclusion is conservative because node names cannot prove
-provenance: no visceral system (holds the NC kidney), no kidney/renal or ear nodes anywhere, and no
-nervous-system point inside the cranium ("Brainder", "White matter"). A unit test checks the last
-two on the shipped bytes.
+**What ships on the landing page:** `src/api/static/body/`, the anatomy statue: the skeletal,
+muscular and cardiovascular systems and a short list of named organs from the licence-cleaned
+`assets/atlas/` GLBs, merged and decimated by `scripts/build_landing_body.py`, licensed CC-BY-SA 4.0
+with `body/CREDITS.txt` and a footer credit. On top of `assets/atlas/`'s removals, the build drops
+every kidney/renal and ear node again by name, leaves the nervous system out entirely, and keeps
+only named organs from the visceral system. `tests/unit/test_demo_static_architecture.py` checks
+that the filters cover every row of `assets/atlas/EXCLUDED.md` and that only those four source
+files ship.
 
 **The full atlas (phase three, `/app/body`):** `assets/atlas/` holds all 8 Holoscan systems at
 original detail (155 MB), built by `scripts/build_atlas.py`, CC-BY-SA 4.0 with `CREDITS.txt`, the
@@ -69,6 +71,7 @@ CC-BY-SA. `tests/unit/test_atlas_assets.py` checks the exclusions on the shipped
 |---|---|---|
 | three.js r186 | MIT | `src/api/static/vendor/` |
 | Geist, Geist Mono | OFL-1.1 | `src/api/static/fonts/` |
+| Playfair Display Italic (landing accent words; the 3D room's structure names) | OFL-1.1 | `src/api/static/fonts/` and `viewer/src/assets/fonts/`, licence in `OFL-PlayfairDisplay.txt` beside each |
 | Phosphor icons | MIT | `src/api/static/icons.svg` |
 | MediaPipe tasks-vision (+ hand landmarker model) | Apache-2.0 | vendored into `viewer/public/` (no CDN) |
 | App npm dependencies (React, React Router, R3F, Drei, Zustand, @phosphor-icons/react) | MIT | `viewer/package.json` |

@@ -6,6 +6,11 @@ import { useLayerStore } from '../store/layerStore';
 import { useStudyStore } from '../store/studyStore';
 import { getFingerRay } from '../utils/raycastUtils';
 import type { GestureState } from '../hooks/useGestureControl';
+import type { Pt } from '../hooks/gestureEngine';
+import { COMMIT } from '../hooks/selectionEngine';
+
+// how far cleared parts fly, in view widths, along the sweep's direction
+const FLY = 1.2;
 
 // refs/GEOMETRY.md exports Posterior -> +Z (glTF "forward"), so a pipeline study arrives with
 // its back to a camera on +Z. The model is turned half a turn about the vertical axis so the
@@ -49,15 +54,22 @@ interface AnatomicalModelProps {
   modelRotationY: number;
   modelScale: number;
   handsVisible: boolean;
-  isFrozen: boolean;
   activeGesture: string;
   // selection & snapshot props
   gestureState: GestureState;
   selectedMesh: string | null;
   setSelectedMesh: (mesh: string | null) => void;
-  onAiSnapshot: (base64Image: string) => void;
+  /** a click (hand or mouse) on a structure (its name) or on empty space (null); Hologram
+   *  resolves it with gestureEngine.resolveClick */
+  onPick: (target: string | null) => void;
+  /** the snapshot gesture fired: `capture` reads the frame, if the parent decides to (atlas only) */
+  onAiSnapshot: (capture: () => string) => void;
   setHoveredMesh: (mesh: string | null) => void;
   partsRemoved: boolean;
+  /** the other hand's live sweep (screen fractions): the unselected parts follow it */
+  removal: { offset: Pt; live: boolean };
+  /** the direction the cleared parts flew off in (screen, unit length) */
+  flyDir: Pt;
   /** turn the model half a turn to face the camera (pipeline studies); false for the atlas */
   faceViewer: boolean;
 }
@@ -68,14 +80,16 @@ export default function AnatomicalModel({
   modelRotationY,
   modelScale,
   handsVisible,
-  isFrozen,
   activeGesture,
   gestureState,
   selectedMesh,
   setSelectedMesh,
+  onPick,
   onAiSnapshot,
   setHoveredMesh,
   partsRemoved,
+  removal,
+  flyDir,
   faceViewer,
 }: AnatomicalModelProps) {
   const groupRef = useRef<THREE.Group>(null);
@@ -108,12 +122,15 @@ export default function AnatomicalModel({
   const { camera, gl } = useThree();
   const aspect = useThree((st) => st.size.width / Math.max(1, st.size.height));
   const hoveredMeshRef = useRef<THREE.Object3D | null>(null); // a structure root
-  const snapshotCooldownRef = useRef(false);
+  const snapshotSeenRef = useRef(gestureState.snapshotId);
 
-  // Edge-trigger refs: fire selection/dismiss only on gesture onset, not every frame
-  const prevVictoryRef = useRef(false);   // was victory ✌️ active last frame?
-  const prevFistRef    = useRef(false);   // was left fist active last frame?
-  const dismissCooldownRef = useRef(false); // brief cooldown after dismiss to stop immediate re-select
+  // scratch vectors for the removal animation (no per-frame allocation)
+  const scratch = useMemo(() => ({
+    right: new THREE.Vector3(), up: new THREE.Vector3(), delta: new THREE.Vector3(),
+    world: new THREE.Vector3(), local: new THREE.Vector3(), centre: new THREE.Vector3(),
+  }), []);
+  const partsRemovedRef = useRef(partsRemoved);
+  useEffect(() => { partsRemovedRef.current = partsRemoved; }, [partsRemoved]);
 
   // The selected structure's root object (a Mesh, or a Group for multi-primitive meshes)
   const selectedMeshRef = useRef<THREE.Object3D | null>(null);
@@ -167,16 +184,33 @@ export default function AnatomicalModel({
     setSelectedMesh(null);
   }, [studyKey, setSelectedMesh]);
 
-  // Mouse path for selection (additive; the gesture path above is unchanged). A click that
-  // ended an orbit drag is ignored, and the first *visible* mesh under the pointer wins.
+  /** The structure a list of ray hits lands on: the first visible mesh, and while a part is
+   *  isolated only that part (the faded-out rest stays loaded and would otherwise catch rays). */
+  const pickFrom = useCallback((hits: THREE.Intersection[]): THREE.Object3D | null => {
+    const g = groupRef.current;
+    if (!g) return null;
+    const hit = hits.find((h) =>
+      (h.object as THREE.Mesh).isMesh && visibleChain(h.object)
+      && (!partsRemovedRef.current || within(h.object, selectedMeshRef.current)));
+    return hit ? rootOf(hit.object, structuresRef.current, g) : null;
+  }, []);
+
+  // Mouse path: the same click rules as the hands. A click that ended an orbit drag is ignored;
+  // a click on empty space is reported by HologramCanvas (onPointerMissed).
+  // Mouse hover (the room redesign; additive, like the mouse click): R3F raycasts only on pointer
+  // moves; the frame loop uses this whenever no hand cursor is up, so the part is named and lit.
+  const mouseHoverRef = useRef<THREE.Object3D | null>(null);
+  const handlePointerMove = useCallback((e: ThreeEvent<PointerEvent>) => {
+    mouseHoverRef.current = pickFrom(e.intersections);
+  }, [pickFrom]);
+  const handlePointerOut = useCallback(() => { mouseHoverRef.current = null; }, []);
+
   const handleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
     if (e.delta > 4) return;
-    const hit = e.intersections.find((h) => (h.object as THREE.Mesh).isMesh && visibleChain(h.object));
-    if (!hit || !groupRef.current) return;
     e.stopPropagation();
-    const root = rootOf(hit.object, structuresRef.current, groupRef.current);
-    if (root) setSelectedMesh(root.name);
-  }, [setSelectedMesh]);
+    const root = pickFrom(e.intersections);
+    onPick(root ? root.name : null);
+  }, [pickFrom, onPick]);
 
   // Frame loop for transforms, raycasting, animations, and snapshot gesture detection
   useFrame((state) => {
@@ -211,67 +245,62 @@ export default function AnatomicalModel({
     // ── Standard Gesture Transforms ──────────────────────────────────────
     gestureScaleRef.current = modelScale;
 
-    const lerpPosRot = handsVisible && !isFrozen;
-    const lerpPos = lerpPosRot || (handsVisible && activeGesture === 'ZOOM');
+    // follow the hands while they are in view; when they leave, the model stays where it was
+    const lerpPosRot = handsVisible;
+    const lerpPos = handsVisible;
     const lerpScale = handsVisible;
+    void activeGesture;
 
     g.rotation.y = THREE.MathUtils.lerp(g.rotation.y, modelRotationY,  lerpPosRot ? 0.12 : 0);
     g.rotation.x = THREE.MathUtils.lerp(g.rotation.x, modelRotationX,  lerpPosRot ? 0.12 : 0);
     g.position.x = THREE.MathUtils.lerp(g.position.x, modelPosition.x, lerpPos ? 0.22 : 0);
     g.position.y = THREE.MathUtils.lerp(g.position.y, modelPosition.y, lerpPos ? 0.22 : 0);
     g.scale.setScalar(THREE.MathUtils.lerp(g.scale.x,  modelScale * autoScale, lerpScale ? 0.18 : 0));
+    // the room's stand follows this group (HallStage, lib/stageFollow): it needs the auto-fit to
+    // tell the gesture zoom apart
+    g.userData.fit = autoScale;
 
-    // ── Raycasting & Part Selection (Freeze Mode Only) ───────────────────
+    // ── Hover: the hand's cursor, whenever it is not grabbing (no freeze mode); else the mouse ──
     let currentHovered: THREE.Object3D | null = null;
-
-    if (isFrozen && gestureState.leftIndexFingerTip) {
-      const raycaster = getFingerRay(
-        gestureState.leftIndexFingerTip.x,
-        gestureState.leftIndexFingerTip.y,
-        camera
-      );
-
-      const intersects = raycaster.intersectObject(g, true);
-      // first VISIBLE mesh: hidden layers stay loaded (never unmounted), so skip them
-      const firstMesh = intersects.find((h) => (h.object as THREE.Mesh).isMesh && visibleChain(h.object));
-
-      if (firstMesh) {
-        currentHovered = rootOf(firstMesh.object, structuresRef.current, g);
-      }
+    if (gestureState.cursor && !gestureState.grabbing) {
+      const ray = getFingerRay(gestureState.cursor.x, gestureState.cursor.y, camera);
+      currentHovered = pickFrom(ray.intersectObject(g, true));
+    } else if (!handsVisible) {
+      currentHovered = mouseHoverRef.current;
     }
-
-    // Handle Hover Highlighting State
     if (currentHovered !== hoveredMeshRef.current) {
       hoveredMeshRef.current = currentHovered;
       setHoveredMesh(currentHovered ? currentHovered.name : null);
-    }
-
-    // ── Victory ✌️ to Select (primary, edge-triggered) ───────────────────
-    const victoryNow   = gestureState.leftVictoryActive;
-    const victoryOnset = victoryNow && !prevVictoryRef.current;
-    prevVictoryRef.current = victoryNow;
-
-    if (isFrozen && victoryOnset && hoveredMeshRef.current && !dismissCooldownRef.current) {
-      setSelectedMesh(hoveredMeshRef.current.name);
-    }
-
-    // ── Dismiss panel on left fist (edge-triggered + cooldown) ───────────
-    const fistNow = gestureState.leftFistActive;
-    const fistOnset = fistNow && !prevFistRef.current;
-    prevFistRef.current = fistNow;
-
-    if (fistOnset && selectedMeshRef.current !== null) {
-      setSelectedMesh(null);
-      // Lock out re-select for 500 ms so the fist-release doesn't immediately
-      // re-trigger the selection on the same gesture.
-      dismissCooldownRef.current = true;
-      setTimeout(() => { dismissCooldownRef.current = false; }, 500);
     }
 
     // ── Dynamic Mesh Animations (Scale, Opacity, and Glowing) ───────────
     const hasSelection = selectedMeshRef.current !== null;
 
     if (allMeshesRef.current.length > 0 && hasSelection) {
+      // Where the unselected parts go, in screen fractions: with the other hand's live sweep;
+      // off along the sweep once cleared; back in from there while a new sweep restores them.
+      const k = Math.min(1, Math.hypot(removal.offset.x, removal.offset.y) / COMMIT);
+      let sx = 0, sy = 0, fade = 1;
+      if (!partsRemoved) {
+        if (removal.live) { sx = removal.offset.x; sy = removal.offset.y; fade = 1 - 0.75 * k; }
+      } else {
+        const back = removal.live ? k : 0;
+        sx = flyDir.x * FLY * (1 - back);
+        sy = flyDir.y * FLY * (1 - back);
+        fade = back;
+      }
+      // screen fractions -> a world displacement in the camera's plane, sized at the model's depth
+      const cam = camera as THREE.PerspectiveCamera;
+      const depth = cam.position.distanceTo(g.getWorldPosition(scratch.centre));
+      const viewH = 2 * depth * Math.tan(THREE.MathUtils.degToRad((cam.fov ?? 50) / 2));
+      const viewW = viewH * (cam.aspect ?? 1);
+      scratch.right.set(1, 0, 0).applyQuaternion(cam.quaternion);
+      scratch.up.set(0, 1, 0).applyQuaternion(cam.quaternion);
+      scratch.delta.copy(scratch.right).multiplyScalar(sx * viewW).addScaledVector(scratch.up, -sy * viewH);
+      const moving = sx !== 0 || sy !== 0;
+      const posLerp = removal.live ? 0.35 : 0.1;
+      const inverses = new Map<string, THREE.Matrix4>(); // one inverse per parent per frame
+
       allMeshesRef.current.forEach((mesh) => {
         const mat = mesh.material as THREE.MeshStandardMaterial;
         if (!mat) return;
@@ -289,24 +318,22 @@ export default function AnatomicalModel({
 
         const isSelected = within(mesh, selectedMeshRef.current);
 
-        // 1. Calculate Target Position & Opacity
-        let targetX = mesh.userData.originalPosition.x;
-        let targetY = mesh.userData.originalPosition.y;
-        let targetOpacity = isSelected ? 1.0 : 0.15;
-
-        if (isSelected) {
-          targetOpacity = 1.0;
-        } else if (partsRemoved) {
-          // Slide away and completely remove all other parts
-          targetX = mesh.userData.originalPosition.x + 4.0;
-          targetOpacity = 0.0;
+        // 1. Position: the selection stays; the rest moves by the world displacement, carried into
+        //    each mesh's parent frame, so the motion matches the hand on screen whatever the
+        //    model's rotation or the GLB's nesting
+        let target: THREE.Vector3 = mesh.userData.originalPosition;
+        if (!isSelected && moving && mesh.parent) {
+          const parent = mesh.parent;
+          let inv = inverses.get(parent.uuid);
+          if (!inv) { inv = parent.matrixWorld.clone().invert(); inverses.set(parent.uuid, inv); }
+          scratch.world.copy(mesh.userData.originalPosition).applyMatrix4(parent.matrixWorld).add(scratch.delta);
+          target = scratch.local.copy(scratch.world).applyMatrix4(inv);
         }
+        mesh.position.lerp(target, isSelected ? 0.12 : posLerp);
 
-        // Smoothly animate position & opacity
-        mesh.position.x = THREE.MathUtils.lerp(mesh.position.x, targetX, 0.12);
-        mesh.position.y = THREE.MathUtils.lerp(mesh.position.y, targetY, 0.12);
-
-        mat.opacity = THREE.MathUtils.lerp(mat.opacity ?? 1.0, targetOpacity, 0.12);
+        // 2. Opacity: the selection full; the rest dimmed, fading as it is swept or cleared
+        const targetOpacity = isSelected ? 1.0 : 0.15 * fade;
+        mat.opacity = THREE.MathUtils.lerp(mat.opacity ?? 1.0, targetOpacity, removal.live ? 0.3 : 0.12);
         mat.transparent = true;
 
         // 2. Calculate Target Scale (selected renders at normal scale)
@@ -317,10 +344,11 @@ export default function AnatomicalModel({
         mesh.scale.z = THREE.MathUtils.lerp(mesh.scale.z, targetScale.z, 0.12);
 
         // 3. Calculate Target Emissive Intensity (pulsing glow)
-        let targetEmissive = 0.3;
+        // the room redesign: a soft breathing glow in the part's own colour, not blown-out neon
+        let targetEmissive = 0.04;
         if (isSelected) {
           const elapsed = state.clock.getElapsedTime();
-          targetEmissive = 1.8 + Math.sin(elapsed * 10) * 0.4; // Strong pulsing selected glow (1.4 - 2.2)
+          targetEmissive = 0.45 + Math.sin(elapsed * 4) * 0.1;
         }
 
         mat.emissiveIntensity = THREE.MathUtils.lerp(
@@ -348,13 +376,11 @@ export default function AnatomicalModel({
 
         const isHovered = within(mesh, hoveredMeshRef.current);
 
-        let targetX = mesh.userData.originalPosition.x;
-        let targetY = mesh.userData.originalPosition.y;
         let targetOpacity = 1.0;
 
-        // Smoothly animate position & opacity
-        mesh.position.x = THREE.MathUtils.lerp(mesh.position.x, targetX, 0.12);
-        mesh.position.y = THREE.MathUtils.lerp(mesh.position.y, targetY, 0.12);
+        // Smoothly animate position & opacity. All three axes: a sweep moves parts in the camera's
+        // plane, which has depth in the model's frame once the view has turned
+        mesh.position.lerp(mesh.userData.originalPosition, 0.12);
 
         mat.opacity = THREE.MathUtils.lerp(mat.opacity ?? 1.0, targetOpacity, 0.12);
         mat.transparent = true;
@@ -367,10 +393,10 @@ export default function AnatomicalModel({
         mesh.scale.z = THREE.MathUtils.lerp(mesh.scale.z, targetScale.z, 0.12);
 
         // 3. Calculate Target Emissive Intensity (pulsing glow)
-        let targetEmissive = 0.3;
+        let targetEmissive = 0.04;
         if (isHovered) {
           const elapsed = state.clock.getElapsedTime();
-          targetEmissive = 1.5 + Math.sin(elapsed * 8) * 0.5; // Hover pulsing glow (1.0 - 2.0)
+          targetEmissive = 0.3 + Math.sin(elapsed * 4) * 0.06; // hover: a gentler glow than selection
         }
 
         mat.emissiveIntensity = THREE.MathUtils.lerp(
@@ -381,29 +407,12 @@ export default function AnatomicalModel({
       });
     }
 
-    // ── AI Snapshot Gesture Detection (Both Index Fingers Pointing) ──────
-    if (gestureState.leftIndexFingerTip && gestureState.rightIndexFingerTip) {
-      const dx = Math.abs(gestureState.leftIndexFingerTip.x - gestureState.rightIndexFingerTip.x);
-      const dy = Math.abs(gestureState.leftIndexFingerTip.y - gestureState.rightIndexFingerTip.y);
-
-      // Pointing towards each other: close horizontally (< 0.15) and vertically (< 0.08)
-      if (dx < 0.15 && dy < 0.08) {
-        if (!snapshotCooldownRef.current) {
-          snapshotCooldownRef.current = true;
-          try {
-            // Capture immediate WebGL framebuffer content
-            const dataUrl = gl.domElement.toDataURL('image/png');
-            onAiSnapshot(dataUrl);
-          } catch (err) {
-            console.error('[AnatomicalModel] Framebuffer snapshot capture failed:', err);
-          }
-        }
-      } else {
-        // Reset once index fingers separate
-        snapshotCooldownRef.current = false;
-      }
-    } else {
-      snapshotCooldownRef.current = false;
+    // ── AI snapshot: the gesture engine detects it (both index fingers pointing at each other,
+    //    once per touch); the parent decides whether the frame is read at all ──────────────────
+    if (gestureState.snapshotId !== snapshotSeenRef.current) {
+      snapshotSeenRef.current = gestureState.snapshotId;
+      // a JPEG: a few hundred KB for this dark scene (the server takes at most ~1.5 MB)
+      onAiSnapshot(() => gl.domElement.toDataURL('image/jpeg', 0.82));
     }
   });
 
@@ -414,7 +423,7 @@ export default function AnatomicalModel({
   }, [autoScale]);
 
   return (
-    <group ref={groupRef} onClick={handleClick}>
+    <group ref={groupRef} name="anatomy-model" onClick={handleClick} onPointerMove={handlePointerMove} onPointerOut={handlePointerOut}>
       {/* Inner group offsets the model centre to origin */}
       <group position={centerOffset.toArray()}>
         <group rotation={[0, faceViewer ? Math.PI : 0, 0]}>

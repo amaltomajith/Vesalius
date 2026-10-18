@@ -1,14 +1,18 @@
-import { useEffect } from 'react';
-import { X } from '@phosphor-icons/react';
+import { useEffect, useState } from 'react';
+import { ArrowsOut, FrameCorners, X } from '@phosphor-icons/react';
 import { getAnatomyInfo } from '../data/anatomyDatabase';
 import { DISCLAIMER, measurementContext } from '../data/measurementContext';
 import { useStudyStore } from '../store/studyStore';
+import { GROUP_COLOURS } from '../store/layerStore';
+import { splitDescription } from '../lib/description';
 import AiInsight from './AiInsight';
 
 interface PartInfoPanelProps {
   selectedMesh: string | null;
   onClose: () => void;
-  leftFistActive?: boolean;
+  /** the selected part is shown on its own */
+  isolated: boolean;
+  onToggleIsolate: () => void;
   /** atlas only: the latest framebuffer snapshot, for the optional vision insight */
   snapshot: string | null;
 }
@@ -16,18 +20,14 @@ interface PartInfoPanelProps {
 const fmt = (n: number | undefined, d = 1) =>
   n === undefined ? '·' : n.toLocaleString(undefined, { maximumFractionDigits: d, minimumFractionDigits: d });
 
-export default function PartInfoPanel({ selectedMesh, onClose, leftFistActive, snapshot }: PartInfoPanelProps) {
+export default function PartInfoPanel({ selectedMesh, onClose, isolated, onToggleIsolate, snapshot }: PartInfoPanelProps) {
   const descriptions = useStudyStore((s) => s.descriptions);
   const current = useStudyStore((s) => s.current);
   const loadDescriptions = useStudyStore((s) => s.loadDescriptions);
   const atlas = current?.manifest.kind === 'atlas';
-
-  // Dismiss if left fist gesture is detected
-  useEffect(() => {
-    if (selectedMesh && leftFistActive) {
-      onClose();
-    }
-  }, [leftFistActive, selectedMesh, onClose]);
+  // "Read more" starts closed for each structure
+  const [more, setMore] = useState<{ node: string | null; open: boolean }>({ node: null, open: false });
+  const readMore = more.node === selectedMesh && more.open;
 
   useEffect(() => {
     if (selectedMesh && atlas) void loadDescriptions();
@@ -43,32 +43,50 @@ export default function PartInfoPanel({ selectedMesh, onClose, leftFistActive, s
   const m = info.measurements;
   const faceCut = !!current?.manifest.deface.structures_cut;
 
+  const swatch = m?.groupId ? GROUP_COLOURS[m.groupId]?.color : undefined;
+  const text = info.description ? splitDescription(info.description) : null;
+
   return (
     <div className="part-info-panel part-info-panel--visible hud-interactive" data-testid="part-info">
       <div className="part-info-panel__header">
         <div>
+          <span className="part-info-panel__system" style={{ '--sys-color': swatch ?? 'var(--room-ink-3)' } as React.CSSProperties}>
+            <i aria-hidden="true" />{info.system}
+          </span>
           <h2 className="part-info-panel__title">{info.displayName}</h2>
-          <span className="part-info-panel__system-badge">{info.system}</span>
           {info.path.length > 0 && <div className="part-info-panel__node">{info.path.join(' / ')}</div>}
-          {!atlas && <div className="part-info-panel__node">{info.node}</div>}
+          {!atlas && <div className="part-info-panel__node mono">{info.node}</div>}
         </div>
         <button className="part-info-panel__close-btn" onClick={onClose} title="Dismiss" aria-label="Close">
-          <X size={16} weight="bold" />
+          <X size={15} />
         </button>
+      </div>
+
+      <div className="part-info-panel__actions">
+        <button type="button" className={`ai-run part-action${isolated ? ' part-action--on' : ''}`} onClick={onToggleIsolate}
+          aria-pressed={isolated} data-testid="isolate-toggle">
+          {isolated ? <ArrowsOut size={14} /> : <FrameCorners size={14} />} {isolated ? 'Show all' : 'Isolate'}
+        </button>
+        <span className="part-action__hint">{isolated ? 'or sweep an open palm sideways, or click empty space' : 'or sweep an open palm sideways, or click it again'}</span>
       </div>
 
       {atlas ? (
         <>
-          <div className="part-info-panel__divider" />
           <div className="part-info-panel__section" data-testid="atlas-description">
-            <h3 className="part-info-panel__section-title">About</h3>
-            {info.description ? (
-              info.description.split('\n\n').map((para, i) => (
-                <p key={i} className="part-info-panel__section-text">{para}</p>
-              ))
+            {text && text.lead ? (
+              <>
+                <p className="part-info-panel__lead">{text.lead}</p>
+                {readMore && text.rest.map((para, i) => <p key={i} className="part-info-panel__section-text">{para}</p>)}
+                {text.rest.length > 0 && (
+                  <button type="button" className="part-info-panel__more"
+                    onClick={() => setMore({ node: selectedMesh, open: !readMore })} aria-expanded={readMore}>
+                    {readMore ? 'Show less' : 'Read more'}
+                  </button>
+                )}
+              </>
             ) : (
               <p className="part-info-panel__section-text">
-                {descriptions ? 'No description for this structure in the atlas.' : 'Loading the description…'}
+                {descriptions ? 'No description for this structure in the atlas.' : 'Loading the description'}
               </p>
             )}
           </div>
@@ -88,8 +106,6 @@ export default function PartInfoPanel({ selectedMesh, onClose, leftFistActive, s
             </dl>
           )}
 
-          <div className="part-info-panel__divider" />
-
           <div className="part-info-panel__section">
             <h3 className="part-info-panel__section-title">Function</h3>
             <p className="part-info-panel__section-text">{info.function}</p>
@@ -103,8 +119,8 @@ export default function PartInfoPanel({ selectedMesh, onClose, leftFistActive, s
 
           <div className="ai-insight-box">
             <div className="ai-insight-box__header">
-              <span className="ai-insight-box__title">MEASUREMENTS &amp; CONTEXT</span>
-              <span className="ai-insight-box__status">FROM PIPELINE</span>
+              <span className="ai-insight-box__title">Measurements &amp; context</span>
+              <span className="ai-insight-box__status">From the pipeline</span>
             </div>
             <ul className="context-list">
               {measurementContext(info, faceCut).map((l) => (

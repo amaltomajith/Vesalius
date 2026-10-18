@@ -5,8 +5,9 @@
 @font-face { font-family: "Geist"; src: url("/static/fonts/Geist-Variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
 @font-face { font-family: "Geist Mono"; src: url("/static/fonts/GeistMono-Variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
 
-/* Light-first by design: the brand is clinical bone-white + surgical green, so the theme is
-   locked to light rather than following the OS (a dark rendering was rejected as off-brand). */
+/* Light by default: clinical bone-white + surgical green, locked rather than following the OS.
+   The landing page overrides these tokens with its own dark set (landing.css; the user chose a
+   dark, cinematic landing on 2026-10-17). */
 :root {
   color-scheme: light;
   --bg: #f3f5f1;

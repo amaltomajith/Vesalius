@@ -1,25 +1,29 @@
-import { Suspense } from 'react';
+import { Suspense, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Grid } from '@react-three/drei';
+import { OrbitControls } from '@react-three/drei';
 import AnatomicalModel from './AnatomicalModel';
+import HallStage from './HallStage';
 import type { GestureState } from '../hooks/useGestureControl';
+import type { Pt } from '../hooks/gestureEngine';
 
 interface HologramCanvasProps {
   gestureState: GestureState;
   selectedMesh: string | null;
   setSelectedMesh: (mesh: string | null) => void;
-  onAiSnapshot: (base64Image: string) => void;
+  onPick: (target: string | null) => void;
+  removal: { offset: Pt; live: boolean };
+  flyDir: Pt;
+  onAiSnapshot: (capture: () => string) => void;
   setHoveredMesh: (mesh: string | null) => void;
   partsRemoved: boolean;
   faceViewer: boolean;
 }
 
-/** HUD-styled loading indicator shown while GLBs are streaming in */
+/** shown while the canvas itself starts: one calm line, the hall already behind it */
 function CanvasLoadingFallback() {
   return (
     <div className="glb-loading-overlay">
-      <div className="glb-loading-ring" />
-      <div className="glb-loading-text">LOADING ANATOMY</div>
+      <p className="glb-loading-text">Loading anatomy</p>
     </div>
   );
 }
@@ -28,37 +32,37 @@ export default function HologramCanvas({
   gestureState,
   selectedMesh,
   setSelectedMesh,
+  onPick,
+  removal,
+  flyDir,
   onAiSnapshot,
   setHoveredMesh,
   partsRemoved,
   faceViewer,
 }: HologramCanvasProps) {
-  const { modelPosition, modelRotationX, modelRotationY, modelScale, handsVisible, activeGesture, isFrozen } = gestureState;
-  // Block orbit-rotate only when a live hand gesture is actively steering the model.
-  // Freeze mode does NOT block orbit controls — user can still scroll-zoom and pan.
-  const gestureIsLive = handsVisible && !isFrozen && activeGesture !== 'NONE';
+  const { modelPosition, modelRotationX, modelRotationY, modelScale, handsVisible, activeGesture } = gestureState;
+  // Block orbit-rotate only while a hand is actually steering the model (a drag or a zoom).
+  const gestureIsLive = handsVisible && gestureState.grabbing;
+  // a click on empty space steps the selection back; the click that ends an orbit drag does not
+  const downAt = useRef<{ x: number; y: number } | null>(null);
 
   return (
-    <div style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, zIndex: 5 }}>
+    <div
+      style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, zIndex: 5 }}
+      onPointerDown={(e) => { downAt.current = { x: e.clientX, y: e.clientY }; }}
+    >
       <Suspense fallback={<CanvasLoadingFallback />}>
         <Canvas
           camera={{ position: [0, 0, 4.5], fov: 50, near: 0.005, far: 100 }}
           gl={{ antialias: true, alpha: true, preserveDrawingBuffer: true }}
+          onPointerMissed={(e) => {
+            const d = downAt.current;
+            if (e.button === 0 && (!d || Math.hypot(e.clientX - d.x, e.clientY - d.y) < 5)) onPick(null);
+          }}
         >
-          {/* Background */}
-          <color attach="background" args={['#0a2a21']} />
-
-          {/* Anatomically-accurate neutral lighting — kept moderate so pigment colours show */}
-          {/* Minimal ambient so shadows don't go pitch-black */}
-          <ambientLight intensity={0.15} color="#ffffff" />
-          {/* Key light: bright neutral-warm from upper-right front */}
-          <directionalLight position={[4, 5, 5]}   intensity={1.1} color="#fff8f0" />
-          {/* Fill: slightly cool from the left to reveal form */}
-          <directionalLight position={[-3, 2, 3]}  intensity={0.45} color="#f0f4ff" />
-          {/* Rim: very soft warm backlight for separation */}
-          <directionalLight position={[0, -2, -5]} intensity={0.25} color="#ffe8d0" />
-          {/* Under-fill: stop the bottom going completely dark */}
-          <pointLight position={[0, -2, 2]} intensity={0.35} distance={8} color="#fff8f0" />
+          {/* the hall (background, spotlight) is CSS on .room behind this transparent canvas;
+              the lights, environment and stage are the landing hall's (HallStage) */}
+          <HallStage />
 
           {/* OrbitControls: zoom/pan always enabled; orbit-rotate blocked only during live hand gesture */}
           <OrbitControls
@@ -70,31 +74,19 @@ export default function HologramCanvas({
             makeDefault
           />
 
-          {/* Grid Floor */}
-          <Grid
-            position={[0, -1.2, 0]}
-            args={[10, 10]}
-            cellSize={0.4}
-            cellThickness={0.4}
-            cellColor="#164a3b"
-            sectionSize={2.0}
-            sectionThickness={0.8}
-            sectionColor="#1f5e4b"
-            fadeDistance={6}
-            infiniteGrid={false}
-          />
-
           <AnatomicalModel
             modelPosition={modelPosition}
             modelRotationX={modelRotationX}
             modelRotationY={modelRotationY}
             modelScale={modelScale}
             handsVisible={handsVisible}
-            isFrozen={isFrozen}
             activeGesture={activeGesture}
             gestureState={gestureState}
             selectedMesh={selectedMesh}
             setSelectedMesh={setSelectedMesh}
+            onPick={onPick}
+            removal={removal}
+            flyDir={flyDir}
             onAiSnapshot={onAiSnapshot}
             setHoveredMesh={setHoveredMesh}
             partsRemoved={partsRemoved}

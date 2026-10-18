@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Sparkle } from '@phosphor-icons/react';
 import { aiStatus, streamAtlasInsight, streamStudyInsight, type AiStatus } from '../services/ai';
-import { useCanAct } from '../store/authStore';
 
 type Props =
   | { kind: 'study'; node: string; label: string; studyId: string; snapshot: null }
@@ -20,7 +19,6 @@ export default function AiInsight(props: Props) {
   const [error, setError] = useState<string | null>(null);
   // request sequence guard (VIEWER-CONSTRAINTS activeRequestRef): a stale stream never writes
   const activeRequestRef = useRef(0);
-  const canAct = useCanAct();
 
   useEffect(() => {
     let live = true;
@@ -36,9 +34,6 @@ export default function AiInsight(props: Props) {
   }, [props.node]);
 
   if (!status) return null;
-  if (status.enabled && !canAct) {
-    return <p className="ai-off" data-testid="ai-off">AI explanation is available to the admin on this showcase.</p>;
-  }
   if (!status.enabled) {
     return (
       <p className="ai-off" data-testid="ai-off">
@@ -72,10 +67,10 @@ export default function AiInsight(props: Props) {
     <div className="ai-insight-box ai-insight-box--ai" data-testid="ai-insight">
       <div className="ai-insight-box__header">
         <span className="ai-insight-box__title">
-          <Sparkle size={11} weight="fill" /> AI EXPLANATION
+          <Sparkle size={12} weight="fill" /> AI explanation
         </span>
         <span className="ai-insight-box__status">
-          {busy ? 'WRITING…' : props.kind === 'study' ? 'FROM MEASUREMENTS' : props.snapshot ? 'FROM SNAPSHOT' : 'FROM NAME'}
+          {busy ? 'Writing' : props.kind === 'study' ? 'From measurements' : props.snapshot ? 'From your snapshot' : 'From the name'}
         </span>
       </div>
       {text && <div className="ai-insight-box__content">{text}</div>}

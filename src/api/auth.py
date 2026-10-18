@@ -3,8 +3,10 @@
 Locally (``PHANTOM_PUBLIC`` unset) nothing changes: the demo is bound to 127.0.0.1 and every route
 is open, as before. On a public deployment (``PHANTOM_PUBLIC=1``) everyone can LOOK (landing,
 app, studies, atlas, gold files, lineage, reports, proof verdicts), and only the admin can DO
-anything: upload a scan, start a run, run a proof, ingest, or ask the paid AI. Public uploads
-are off because this project must never receive real patient data (CLAUDE.md hard rule 1).
+anything: upload a scan, start a run, run a proof, ingest. Public uploads are off because this
+project must never receive real patient data (CLAUDE.md hard rule 1). The one exception is the AI
+explanations (user decision 2026-10-18): open to visitors, limited per client IP and per day
+(`ai_limit`) so the free Groq quota cannot be drained.
 
 Standard library only: scrypt password hashing and an HMAC-signed, expiring session cookie.
 
@@ -23,6 +25,7 @@ import secrets
 import sys
 import time
 from collections import defaultdict, deque
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field
@@ -31,6 +34,8 @@ COOKIE = "phantom_admin"
 SESSION_SECONDS = 12 * 3600
 _SCRYPT = {"n": 2**15, "r": 8, "p": 1}
 _MAX_FAILS, _FAIL_WINDOW = 5, 600.0  # per client IP: 5 wrong passwords per 10 minutes
+AI_PER_IP, AI_WINDOW = 10, 3600.0      # per visitor: 10 AI explanations an hour
+AI_DAILY_CAP_DEFAULT = 300             # the whole site, per UTC day (PHANTOM_AI_DAILY_CAP)
 
 
 def public_mode() -> bool:
@@ -99,6 +104,46 @@ def require_admin(request: Request) -> None:
     """Dependency on every route that changes anything. A no-op unless PHANTOM_PUBLIC=1."""
     if not is_admin(request):
         raise HTTPException(status_code=401, detail="Sign in as the admin to do this.")
+
+
+# ---- the AI: open to visitors, but limited ----------------------------------------------------
+_ai_calls: dict[str, deque[float]] = defaultdict(deque)
+_ai_day: dict[str, Any] = {"day": "", "count": 0}
+_clock = time.monotonic                                            # tests move these
+_today = lambda: time.strftime("%Y-%m-%d", time.gmtime())  # noqa: E731
+
+
+def ai_daily_cap() -> int:
+    try:
+        return max(0, int(os.environ.get("PHANTOM_AI_DAILY_CAP", AI_DAILY_CAP_DEFAULT)))
+    except ValueError:
+        return AI_DAILY_CAP_DEFAULT
+
+
+def ai_limit(request: Request) -> None:
+    """Dependency on the AI routes. A no-op locally and for the admin; on a public deployment each
+    visitor gets AI_PER_IP explanations per AI_WINDOW, and the site PHANTOM_AI_DAILY_CAP per day."""
+    if not public_mode() or is_admin(request):
+        return
+    ip = request.client.host if request.client else "?"
+    now = _clock()
+    calls = _ai_calls[ip]
+    while calls and now - calls[0] > AI_WINDOW:
+        calls.popleft()
+    if len(calls) >= AI_PER_IP:
+        raise HTTPException(
+            status_code=429, detail="That is ten explanations this hour. Try again a little later."
+        )
+    today = _today()
+    if _ai_day["day"] != today:
+        _ai_day.update(day=today, count=0)
+    if _ai_day["count"] >= ai_daily_cap():
+        raise HTTPException(
+            status_code=429,
+            detail="The AI has reached today's limit on this showcase. Try tomorrow.",
+        )
+    calls.append(now)
+    _ai_day["count"] += 1
 
 
 # ---- routes -------------------------------------------------------------------------------------

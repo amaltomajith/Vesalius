@@ -1,0 +1,11 @@
+Landing page anatomy statue: data credit and licence
+
+Derived from the Z-Anatomy atlas as bundled with the Holoscan viewer:
+  "BodyParts3D - The Database Center for Life Science - CC-BY-SA 2.1 Japan"
+  "Z-Anatomy - The open source atlas of anatomy - CC-BY-SA 4.0"
+
+Changes: the skeletal, muscular and cardiovascular systems and a short list of named organs were
+merged per system, decimated, uniformly scaled and moved to line up with a real head CT.
+Excluded: the nervous system and every kidney, renal and ear structure (third-party parts under
+non-commercial or unstated licences). These meshes (body.bin / body.json) are licensed
+CC-BY-SA 4.0. Built by scripts/build_landing_body.py; source file hashes are in body.json.

@@ -3,22 +3,31 @@ import type { GroupEntry, StructuresManifest } from '../contract/meshContract';
 
 // Groups now come from each study's manifest (refs/INTEGRATION.md §4.2): an abdomen CT has no
 // `nervous` group. Colours are a stable map keyed by group id, so `visceral` is always the same
-// orange whichever groups a study contains. Group colours belong to the layer system, not the
+// colour whichever groups a study contains. Group colours belong to the layer system, not the
 // UI chrome (refs/VIEWER-CONSTRAINTS.md, design tokens).
+//
+// The anatomical palette (2026-10-18, the room redesign): ivory bone as on the landing's statue,
+// deep red vessels, coral organs, yellow nerves... chosen within each system's anatomical hue and
+// checked with the dataviz palette validator on the hall surface (#060b09), all pairs that can be
+// on screen together (the atlas's 8 systems; a study's 7): normal-vision floor PASS (worst 15.5),
+// CVD separation PASS (worst 8.0). Deliberate exceptions, relieved by the names always shown in
+// the layer list, the hover label and the part card: bone is ivory (outside the chart lightness
+// band, low chroma) and vessels sit at 2.99:1 against the hall. The emissive is the colour itself,
+// so a selected part glows in its own system's colour, never a neon twin.
+const tone = (color: string) => ({ color, emissive: color });
 export const GROUP_COLOURS: Record<string, { color: string; emissive: string }> = {
-  skeletal:       { color: '#C0C8D0', emissive: '#8899AA' },
-  cardiovascular: { color: '#FF4466', emissive: '#FF0033' },
-  visceral:       { color: '#FF8844', emissive: '#FF6600' },
-  respiratory:    { color: '#44FFEE', emissive: '#00CCBB' },
-  muscular:       { color: '#FF6688', emissive: '#FF3355' },
-  nervous:        { color: '#FFEE44', emissive: '#FFCC00' },
-  endocrine:      { color: '#4488FF', emissive: '#0055FF' },
-  // Holoscan's atlas systems keep Holoscan's colours
-  lymphoid:       { color: '#44FFEE', emissive: '#00CCBB' },
-  joints:         { color: '#4488FF', emissive: '#0055FF' },
-  regions:        { color: '#8090A0', emissive: '#303C48' },
-  other:          { color: '#8090A0', emissive: '#303C48' },
-  surface:        { color: '#EDE6D6', emissive: '#8A8272' }, // a bone / skin result
+  skeletal:       tone('#e8dfc8'),
+  cardiovascular: tone('#934542'),
+  visceral:       tone('#dc9769'),
+  respiratory:    tone('#28c3b8'),
+  muscular:       tone('#dc5481'),
+  nervous:        tone('#dccc23'),
+  endocrine:      tone('#775bac'),
+  lymphoid:       tone('#338e3a'),
+  joints:         tone('#0983df'),
+  regions:        tone('#8048b6'),
+  other:          tone('#8a9a94'),
+  surface:        tone('#ede6d6'), // a bone / skin result
 };
 const FALLBACK_COLOUR = GROUP_COLOURS.other;
 

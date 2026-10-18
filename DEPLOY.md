@@ -1,16 +1,28 @@
 # Deploying Phantom (free)
 
-A public, read-only showcase plus one admin login that unlocks uploads, pipeline runs, proofs and
-the optional AI. Everything below is free: an Oracle Cloud **Always Free** ARM VM, a **DuckDNS**
-name, **Caddy** for HTTPS, **GitHub Actions** for CI, **UptimeRobot** for alerts.
+A public showcase plus one admin login that unlocks uploads, pipeline runs and proofs. Everything
+below is free (checked October 2026):
+
+- an Oracle Cloud **Always Free** Ampere A1 VM (arm64)
+- a **DuckDNS** name, with **Caddy** for HTTPS
+- **GitHub Actions** for CI and for building the arm64 image, with **ghcr.io** to hold it
+- **UptimeRobot** for alerts
 
 ```
 internet ──443──> Caddy ──> api:8000        https://<name>.duckdns.org        landing, /app, /studies, /docs
                         └─> minio:9000      https://files.<name>.duckdns.org  GET/HEAD /gold/* only
                  (postgres, minio, api: no host ports)
+
+GitHub (public repo) ── CI on ubuntu-24.04-arm ──> ghcr.io/<you>/phantom-api ──pull──> the VM
 ```
 
 Locally nothing changes: `Start Demo.bat` still runs everything on `127.0.0.1` with no login.
+
+**Why this stack:** the research behind it is in the session's report "Free hosting for Phantom".
+Oracle's A1 is the only always-free machine that can run a segmentation:
+- Free container platforms stop at 1 GB of RAM.
+- Hugging Face Docker Spaces now need a paid plan.
+- Google, AWS and Azure give 1 GB, or credits that run out.
 
 ## What public mode does
 
@@ -18,86 +30,99 @@ Locally nothing changes: `Start Demo.bat` still runs everything on `127.0.0.1` w
 
 - **Visitors can look:** landing, app, studies, hologram, full-body atlas, lineage, reports, proof
   verdicts, API docs, gold downloads.
-- **Only the admin can act:** `POST /demo/runs/*`, `POST /demo/proofs/*`, `/ingest`, `/ai/explain/*`
-  return 401 to everyone else. A unit test fails if a new mutating route forgets the guard.
-- **Admin login:** at `/app/login`. One password, stored only as a scrypt hash in `.env`. The
-  session cookie is signed, HttpOnly, Secure, SameSite=Strict and lasts 12 hours. After 5 wrong
-  passwords from one IP, logins from it are refused for 10 minutes.
-- **Downloads:** presigned download links are signed for `https://files.<domain>`. Caddy only lets
-  through reads of the gold bucket. Bronze, silver, quarantine and the MinIO console are
-  unreachable.
+- **Visitors can ask the AI**, within limits:
+  - 10 explanations an hour per visitor
+  - 300 a day for the whole site (`PHANTOM_AI_DAILY_CAP`), so the free Groq quota can't be drained
+  - Snapshots are sent only for the atlas, never for a patient study (CLAUDE.md hard rule 8).
+- **Only the admin can act:** `POST /demo/runs/*`, `POST /demo/proofs/*` and `/ingest` return 401
+  to everyone else.
+  - A unit test walks the real route table and fails if a new mutating route has neither the admin
+    guard nor, for the two AI routes, the rate limit.
+  - Public uploads are off because this project must never receive real patient data (hard rule 1).
+- **Admin login:** at `/app/login` (the lock icon in the top bar).
+  - One password, stored only as a scrypt hash in `.env`.
+  - The session cookie is signed, HttpOnly, Secure, SameSite=Strict, and lasts 12 hours.
+  - After 5 wrong passwords from one IP, that IP is refused for 10 minutes.
+- **Downloads:** presigned links are signed for `https://files.<domain>`, and Caddy lets through only
+  reads of the gold bucket. Bronze, silver, quarantine and the MinIO console are unreachable.
 
 ## 1 · Accounts (you)
 
-1. **GitHub:** the private repository, with CI in `.github/workflows/ci.yml`.
-2. **Oracle Cloud:** sign up at <https://signup.cloud.oracle.com>. A card is needed for identity
-   only; Always Free resources are not charged. Pick a home region with Ampere A1 capacity; it
-   can't be changed later.
-3. **DuckDNS:** log in at <https://www.duckdns.org>, create a subdomain (e.g. `phantom-yourname`),
+1. **GitHub.** Create a **public** repository and push this branch to it as `main`. CI
+   (`.github/workflows/ci.yml`) then builds the arm64 api image and publishes it as
+   `ghcr.io/<you>/phantom-api`.
+   - After the first green run, open the package on GitHub (your profile → Packages →
+     `phantom-api` → Package settings) and set its visibility to **Public**. ghcr.io packages
+     start private even for public repositories, and the server pulls without a login.
+2. **Oracle Cloud.** Sign up at <https://signup.cloud.oracle.com>.
+   - A phone number and a card are needed for identity; Always Free resources are not charged.
+   - Pick a **home region** with Ampere A1 capacity. It can't be changed later, and all free
+     compute lives there.
+   - Stay on the free account (the decision for this deployment): no Pay As You Go upgrade, so
+     the card can never be billed.
+3. **DuckDNS.** Log in at <https://www.duckdns.org>, create a subdomain (e.g. `phantom-yourname`),
    and copy the **token**.
+4. **Groq (optional).** A free API key from <https://console.groq.com> for the AI explanations.
+   You put it in `.env` on the server yourself (step 4).
 
 ## 2 · The VM (you, in the Oracle console)
 
-1. Go to Compute → Instances → Create.
+1. Compute → Instances → Create:
    - **Image:** Ubuntu 24.04.
-   - **Shape:** Ampere `VM.Standard.A1.Flex` with **4 OCPU / 24 GB**.
-   - **Boot volume:** 100–200 GB.
+   - **Shape:** Ampere `VM.Standard.A1.Flex`, **2 OCPU / 12 GB**.
+     - **Not more.** Since 15 June 2026 that is the whole free allowance (it was 4 / 24).
+     - If the account's A1 usage is above it when the trial ends, Oracle deletes the A1 instances.
+   - **Boot volume:** 100 GB (the free allowance is 200 GB of block storage in total).
    - **SSH key:** add your public key.
-   - If Oracle says it is "out of capacity", retry later or in another availability domain.
-     This is common.
-2. Networking → the VCN → Security List → add ingress rules for **TCP 80 and 443** from
+   - **"Out of host capacity" is common.** Retry in another availability domain, or later.
+2. Networking → the VCN → Security List: add ingress rules for **TCP 80 and 443** from
    `0.0.0.0/0`. Port 22 is already there.
-3. Optional but recommended: turn the account into **Pay As You Go**. You stay free within the
-   limits, and idle Always Free VMs can no longer be reclaimed.
-4. Point the DuckDNS subdomain at the VM's public IP. `setup-server.sh` keeps it updated.
+3. Point the DuckDNS subdomain at the VM's public IP. `setup-server.sh` keeps it updated.
 
 ## 3 · Install (on the VM)
 
 ```bash
 ssh ubuntu@<vm-ip>
-# a read-only deploy key for the private repo:
-ssh-keygen -t ed25519 -f ~/.ssh/phantom_deploy -N ""   # add the .pub in GitHub -> repo -> Settings -> Deploy keys
-GIT_SSH_COMMAND="ssh -i ~/.ssh/phantom_deploy" git clone git@github.com:<you>/phantom.git ~/phantom
-cd ~/phantom && git config core.sshCommand "ssh -i ~/.ssh/phantom_deploy"
-
+git clone https://github.com/<you>/<repo>.git ~/phantom      # public: no key needed
+cd ~/phantom
 sudo bash scripts/deploy/setup-server.sh phantom-yourname.duckdns.org <duckdns-token>
 exit   # log in again so the docker group applies
 ```
 
-`setup-server.sh` does five things:
-- installs Docker;
-- opens only 22/80/443;
-- adds 4 GB of swap;
-- installs the DuckDNS updater;
-- writes `.env`: random database, MinIO and de-identification secrets, the domain, and a session secret.
+`setup-server.sh` (idempotent: safe to run again):
+- installs Docker
+- opens only 22/80/443
+- adds 4 GB of swap
+- installs the DuckDNS updater
+- turns on automatic security updates
+- writes `.env`:
+  - random database, MinIO and de-identification secrets
+  - the domain and a session secret
+  - `PHANTOM_IMAGE`, read from the git remote
 
 ## 4 · Deploy
+
+Optional, the AI: `nano ~/phantom/.env` and set `GROQ_API_KEY=` to your key. You type it; nothing
+else ever writes it.
 
 ```bash
 cd ~/phantom
 bash scripts/deploy/deploy.sh --studies
 ```
 
-The first run takes a while:
-- It asks for the **admin password** (12+ characters). Only its hash is written to `.env`.
-- It builds the image natively on ARM64, which takes 15–30 minutes the first time.
-- It starts the stack and, because of `--studies`, loads the three public CT studies (head,
-  chest, abdomen). That downloads the scans and the segmentation model; allow 20–40 minutes on
-  the A1 cores.
+The first run:
+- **Asks for the admin password** (12+ characters). Only its hash goes into `.env`.
+- **Pulls the arm64 image** CI built (`docker pull`, a few minutes). Nothing is built on the VM;
+  `--build` builds here instead, if CI is ever unavailable (slow on 2 cores).
+- **Starts the stack and loads the three public CT studies** (head, chest, abdomen). That downloads
+  the scans and the segmentation model and segments one study at a time.
+  - It is unmeasured on 2 A1 cores: allow an hour, and write the real time here after the first run.
 
-Later updates are just `bash scripts/deploy/deploy.sh`: it runs `git pull`, then rebuilds and
-restarts.
+Later updates: push to `main`, wait for CI to go green, then `bash scripts/deploy/deploy.sh`. It
+pulls the code and the new image and restarts.
 
-**Backups:** add this with `crontab -e`:
-
-```
-30 3 * * * bash /home/ubuntu/phantom/scripts/deploy/backup.sh >> /home/ubuntu/backup.log 2>&1
-```
-
-It takes a nightly Postgres dump plus silver and gold, and keeps 7 days in
-`/var/backups/phantom`. Bronze is not copied: every scan here is public and can be fetched again.
-
-**Uptime:** add a free UptimeRobot HTTP monitor on `https://<domain>/health`.
+**Uptime:** add two free UptimeRobot HTTP monitors, `https://<domain>/health` and
+`https://<domain>/`, with alerts to your email.
 
 ## 5 · Check it
 
@@ -114,16 +139,48 @@ nmap -Pn -p 1-10000 $D                                       # only 22, 80, 443 
 ```
 
 Then in a browser:
-- open `/app`, a study, the hologram (the camera prompt appears: HTTPS) and the full body;
-- sign in at `/app/login` and run one proof.
+- open `/app`, a study, the hologram (the camera prompt appears because it's HTTPS) and the full body
+- ask the AI about a structure
+- sign in at `/app/login` and run proof 5 ("the 3D viewer never shows a face")
+
+## If the VM is lost (reclaimed, deleted, or no longer reachable)
+
+There is nothing to back up.
+- **Every scan is public and re-created exactly.** `deploy.sh --studies` rebuilds the same gold,
+  and the reproducibility proof guarantees byte-identical output.
+- **The only state is `.env`:** keep a private copy of it (secrets, admin hash, Groq key). A lost
+  `.env` only means new secrets and a new admin password.
+
+To rebuild:
+1. create a new VM (§2)
+2. run setup-server (§3)
+3. copy your saved `.env` back (or let setup-server make a new one)
+4. run `deploy.sh --studies`
+
+About half an hour of your time, plus the study load.
+
+`scripts/deploy/backup.sh` still exists if you want nightly dumps on the VM, but they live on the
+same machine, so they don't survive losing it.
 
 ## Limits worth knowing
 
-- **ARM64:** the image was built and tested on x86-64. On ARM every dependency has aarch64 wheels
-  (checked with `pip download --platform manylinux2014_aarch64`), and S10's decimator was
-  switched from pymeshlab (no ARM build) to fast-simplification for this reason. S8 timings on
-  A1 cores are unmeasured until the first run.
+- **Idle reclamation.** Oracle may reclaim an Always Free instance when its CPU (95th percentile),
+  network and memory all stay under 20% for 7 days.
+  - A quiet showcase can meet that. Uptime pings don't prevent it, because they measure answers,
+    not load.
+  - With the free-only decision, the defences are the rebuild path above and the UptimeRobot
+    alert.
+  - Measure the stack's resident memory against the 20% line (2.4 GB of 12) after the first
+    deploy, and note it here.
+- **2 cores, 12 GB, one heavy job at a time.**
+  - A segmentation, proof or run holds a lock while the others wait (`api/demo_state.HEAVY_LOCK`).
+  - Memory: api 8 GB, Postgres 1 GB, MinIO 1 GB, Caddy 256 MB, plus 4 GB of swap.
+- **arm64.**
+  - The image is built natively on GitHub's arm64 runner and smoke-tested there: every heavy import
+    plus the unit suite, before it is pushed.
+  - PyTorch comes from its CPU index; `torch 2.14.0+cpu` has an aarch64 wheel.
+  - S10 decimates with fast-simplification, because pymeshlab had no arm64 build.
 - **One admin, no user accounts.** Out of scope by design.
 - **Never upload real patient scans**, not even as the admin (CLAUDE.md hard rule 1).
-- **Free tier:** Oracle can be out of A1 capacity, and can reclaim idle Always Free VMs unless
-  the account is Pay As You Go.
+- **Free services change.** This file reflects October 2026 (Oracle halved A1 in June 2026 with no
+  announcement). Recheck the limits before relying on them.

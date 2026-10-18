@@ -30,7 +30,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
-from api.auth import require_admin
+from api.auth import ai_limit
 from api.dependencies import serving_session_dependency, settings_dependency
 from api.routers import ui
 from pipeline.common.config import Settings
@@ -41,9 +41,15 @@ router = APIRouter(prefix="/ai", tags=["ai"])
 ServingSession = Annotated[Session, Depends(serving_session_dependency)]
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-TEXT_MODEL = os.environ.get("GROQ_TEXT_MODEL", "llama-3.3-70b-versatile")
-VISION_MODEL = os.environ.get("GROQ_VISION_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
-MAX_IMAGE_BYTES = 6_000_000  # a data: URL of one canvas frame
+# Groq sits behind Cloudflare, which refuses Python's default urllib user agent with a 403
+# ("error code: 1010", found live 2026-10-18): every request names this app instead.
+USER_AGENT = "phantom-viewer/1.0"
+# Groq retires models (2026-10-18: llama-3.3-70b-versatile and llama-4-scout were gone, every
+# call 404'd). Defaults from its live /models list: a text model, and the one chat model that
+# takes images (for the atlas snapshot). Both answered in full within the 260-token cap.
+TEXT_MODEL = os.environ.get("GROQ_TEXT_MODEL", "openai/gpt-oss-120b")
+VISION_MODEL = os.environ.get("GROQ_VISION_MODEL", "qwen/qwen3.8-27b")
+MAX_IMAGE_BYTES = 2_000_000  # a data: URL of one canvas frame (a JPEG, ~1.5 MB at most)
 
 STUDY_RULES = (
     "You explain CT measurements for a 3D visualisation tool. Describe what the supplied "
@@ -136,15 +142,26 @@ def _atlas_nodes() -> frozenset[str]:
 # ---- upstream -----------------------------------------------------------------------------------
 
 
+def _reasoning(model: object) -> dict[str, str]:
+    """gpt-oss thinks before it answers, and its thinking counts against max_tokens: kept low, so
+    a measurements prompt is answered in full instead of cut off mid-sentence (seen live)."""
+    return {"reasoning_effort": "low"} if str(model).startswith("openai/gpt-oss") else {}
+
+
 def open_stream(key: str, payload: dict[str, Any]) -> Iterator[str]:
     """Streams text deltas from Groq's OpenAI-compatible endpoint. Opened BEFORE the response
     starts, so an upstream error becomes an HTTP error instead of a broken stream."""
     req = urllib.request.Request(  # noqa: S310 -- fixed https URL
         GROQ_URL,
         data=json.dumps(
-            {**payload, "stream": True, "temperature": 0.2, "max_tokens": 260}
+            {**payload, **_reasoning(payload.get("model")), "stream": True, "temperature": 0.2,
+             "max_tokens": 260}
         ).encode(),
-        headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}"},
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {key}",
+            "User-Agent": USER_AGENT,
+        },
     )
     try:
         resp = urllib.request.urlopen(req, timeout=60)  # noqa: S310
@@ -169,7 +186,7 @@ def open_stream(key: str, payload: dict[str, Any]) -> Iterator[str]:
     return lines()
 
 
-@router.post("/explain/study", dependencies=[Depends(require_admin)])
+@router.post("/explain/study", dependencies=[Depends(ai_limit)])
 def explain_study(
     body: StudyRequest,
     session: ServingSession,
@@ -194,7 +211,7 @@ def explain_study(
 _DATA_URL = re.compile(r"^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$")
 
 
-@router.post("/explain/atlas", dependencies=[Depends(require_admin)])
+@router.post("/explain/atlas", dependencies=[Depends(ai_limit)])
 def explain_atlas(body: AtlasRequest) -> StreamingResponse:
     key = _require_key()
     if body.node not in _atlas_nodes():

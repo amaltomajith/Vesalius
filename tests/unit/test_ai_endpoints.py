@@ -154,3 +154,56 @@ def test_the_atlas_may_send_its_snapshot(
         json={"node": "Femurl", "label": "Femur", "image": "javascript:alert(1)"},
     )
     assert bad.status_code == 422
+
+
+def test_requests_to_groq_name_the_app_not_python(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Groq's Cloudflare edge answers Python's default urllib user agent with a 403
+    (error code 1010): the request must carry the app's own User-Agent."""
+    seen: list[Any] = []
+
+    class FakeResponse:
+        def __enter__(self) -> FakeResponse:
+            return self
+
+        def __exit__(self, *exc: object) -> None:
+            return None
+
+        def __iter__(self) -> Iterator[bytes]:
+            return iter([b'data: {"choices":[{"delta":{"content":"ok"}}]}', b"data: [DONE]"])
+
+    def fake_urlopen(req: Any, timeout: float) -> FakeResponse:
+        seen.append(req)
+        return FakeResponse()
+
+    monkeypatch.setattr(ai.urllib.request, "urlopen", fake_urlopen)
+    text = "".join(ai.open_stream("test-key", {"model": "m", "messages": []}))
+    assert text == "ok"
+    agent = seen[0].get_header("User-agent")
+    assert agent == ai.USER_AGENT
+    assert not agent.lower().startswith("python")
+
+
+def test_gpt_oss_reasons_briefly_so_the_answer_fits(monkeypatch: pytest.MonkeyPatch) -> None:
+    """gpt-oss's thinking counts against max_tokens; a long prompt was cut off mid-sentence."""
+    bodies: list[dict[str, Any]] = []
+
+    class Empty:
+        def __enter__(self) -> Empty:
+            return self
+
+        def __exit__(self, *exc: object) -> None:
+            return None
+
+        def __iter__(self) -> Iterator[bytes]:
+            return iter([])
+
+    def fake_urlopen(req: Any, timeout: float) -> Empty:
+        bodies.append(json.loads(req.data))
+        return Empty()
+
+    monkeypatch.setattr(ai.urllib.request, "urlopen", fake_urlopen)
+    list(ai.open_stream("k", {"model": "openai/gpt-oss-120b", "messages": []}))
+    list(ai.open_stream("k", {"model": "qwen/qwen3.8-27b", "messages": []}))
+    assert bodies[0]["reasoning_effort"] == "low"
+    assert "reasoning_effort" not in bodies[1]
+

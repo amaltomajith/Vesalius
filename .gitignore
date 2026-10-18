@@ -18,7 +18,7 @@ tests/proofs/_out/
 # written by scripts/wait-for-demo.ps1
 .demo_url
 
-# real public scans fetched by "Get Real Head CT.bat" (third-party data; not redistributed)
+# third-party scans fetched locally (never redistributed: CLAUDE.md hard rule 1, LICENSES.md)
 real_scans/
 
 # landing asset builder downloads (source data is fetched, never committed)

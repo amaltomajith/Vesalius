@@ -18,7 +18,9 @@ from api import main as api_main
 from pipeline.common.config import Settings
 from pipeline.storage.object_store import gold_presign_client
 
-OPEN_WRITES = {"/auth/login", "/auth/logout"}  # the only non-GET routes a visitor may call
+OPEN_WRITES = {"/auth/login", "/auth/logout"}  # the only non-GET routes a visitor may call freely
+# open to visitors on purpose (user decision 2026-10-18), but only through the AI rate limit
+RATE_LIMITED = {"/ai/explain/study", "/ai/explain/atlas"}
 
 
 def _all_routes(routes: list[Any]) -> list[APIRoute]:
@@ -62,12 +64,17 @@ def test_there_are_mutating_routes_to_protect() -> None:
 @pytest.mark.parametrize("route", _mutating_routes(), ids=lambda r: r.path)
 def test_every_mutating_route_requires_the_admin(route: APIRoute) -> None:
     calls = {d.call for d in route.dependant.dependencies}
+    if route.path in RATE_LIMITED:
+        assert auth.ai_limit in calls, f"{route.path} is open to visitors without its rate limit"
+        return
     assert auth.require_admin in calls, f"{route.path} can be called by anyone in public mode"
 
 
 def test_a_visitor_is_refused_on_every_mutating_route(public: str) -> None:
     client = TestClient(api_main.create_app())
     for route in _mutating_routes():
+        if route.path in RATE_LIMITED:
+            continue  # tested below: open, then limited
         path = re.sub(r"\{[^}]+\}", "x", route.path)
         method = sorted(route.methods - {"GET", "HEAD"})[0]
         r = client.request(method, path, json={})
@@ -128,3 +135,63 @@ def test_download_links_are_signed_for_the_public_https_host() -> None:
     s = Settings(minio_public_endpoint="files.phantom.example", minio_public_secure=True)
     url = gold_presign_client(s).presigned_get_object("gold", "a/b.glb")
     assert url.startswith("https://files.phantom.example/gold/a/b.glb?")
+
+
+# ---- the AI: open to visitors, limited -------------------------------------------------------
+
+
+@pytest.fixture
+def ai_open(public: str, monkeypatch: pytest.MonkeyPatch) -> dict[str, float]:
+    """A public server with a (fake) Groq key; nothing leaves the process. Returns the clock."""
+    from api.routers import ai
+
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    monkeypatch.setattr(ai, "open_stream", lambda key, payload: iter(["ok"]))
+    monkeypatch.setattr(ai, "_atlas_nodes", lambda: frozenset({"Femur"}))
+    clock = {"t": 1000.0}
+    monkeypatch.setattr(auth, "_clock", lambda: clock["t"])
+    monkeypatch.setattr(auth, "_today", lambda: "2026-10-19")
+    auth._ai_calls.clear()
+    auth._ai_day.update(day="", count=0)
+    return clock
+
+
+def _explain(client: TestClient) -> int:
+    return client.post("/ai/explain/atlas", json={"node": "Femur", "label": "Femur"}).status_code
+
+
+def test_a_visitor_may_ask_the_ai_ten_times_an_hour(ai_open: dict[str, float]) -> None:
+    client = TestClient(api_main.create_app())
+    assert [_explain(client) for _ in range(11)] == [200] * 10 + [429]
+    ai_open["t"] += 3601                     # an hour later the window has moved on
+    assert _explain(client) == 200
+
+
+def test_the_site_stops_at_its_daily_ai_cap(
+    ai_open: dict[str, float], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("PHANTOM_AI_DAILY_CAP", "3")
+    clients = [TestClient(api_main.create_app(), client=(f"10.0.0.{i}", 50000)) for i in range(5)]
+    codes = [_explain(c) for c in clients]
+    assert codes == [200, 200, 200, 429, 429]       # five visitors, three answers, then the cap
+    monkeypatch.setattr(auth, "_today", lambda: "2026-10-20")
+    assert _explain(clients[4]) == 200               # a new day
+
+
+def test_the_admin_is_not_limited(ai_open: dict[str, float]) -> None:
+    client = TestClient(api_main.create_app(), base_url="https://testserver")
+    assert client.post("/auth/login", json={"password": "correct horse battery"}).status_code == 200
+    assert all(_explain(client) == 200 for _ in range(15))
+
+
+def test_locally_the_ai_has_no_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+    from api.routers import ai
+
+    monkeypatch.delenv("PHANTOM_PUBLIC", raising=False)
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    monkeypatch.setattr(ai, "open_stream", lambda key, payload: iter(["ok"]))
+    monkeypatch.setattr(ai, "_atlas_nodes", lambda: frozenset({"Femur"}))
+    auth._ai_calls.clear()
+    client = TestClient(api_main.create_app())
+    assert all(_explain(client) == 200 for _ in range(15))
+

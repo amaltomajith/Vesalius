@@ -4,6 +4,7 @@ import { BrowserRouter, Route, Routes } from 'react-router';
 import './styles/tokens.css';
 import './styles/app.css';
 import './index.css';
+import './styles/room.css'; // the 3D room as the landing's hall: after index.css, which it restyles
 import Shell from './app/Shell';
 import Dashboard from './screens/Dashboard';
 import Pipeline from './screens/Pipeline';

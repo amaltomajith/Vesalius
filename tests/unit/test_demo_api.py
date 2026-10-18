@@ -55,7 +55,7 @@ def _zip_bytes() -> bytes:
 def test_the_pages_and_their_assets_are_served(client: TestClient) -> None:
     landing = client.get("/")
     assert landing.status_code == 200 and 'href="/app/"' in landing.text
-    assert landing.text.count("<canvas") == 1 and 'id="scan-canvas"' in landing.text
+    assert landing.text.count("<canvas") == 1 and 'id="hall-canvas"' in landing.text
     # the console became the Phantom app: its old address redirects there
     console = client.get("/console", follow_redirects=False)
     assert console.status_code == 308 and console.headers["location"] == "/app/pipeline"
@@ -66,12 +66,13 @@ def test_the_pages_and_their_assets_are_served(client: TestClient) -> None:
         "icons.svg",
         "fonts/Geist-Variable.woff2",
         "fonts/GeistMono-Variable.woff2",
-        "scan-scene.js",
+        "fonts/PlayfairDisplay-Italic.woff2",
+        "hall-scene.js",
         "scan/head_points.bin",
         "scan/head_points.json",
-        "atlas/atlas_points.bin",
-        "atlas/atlas_points.json",
-        "atlas/CREDITS.txt",
+        "body/body.bin",
+        "body/body.json",
+        "body/CREDITS.txt",
         "vendor/three.module.min.js",
         "vendor/three.core.js",
     ):

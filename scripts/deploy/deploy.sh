@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Deploy (or redeploy) the public Phantom showcase on the server. Run from the repository:
 #
-#   bash scripts/deploy/deploy.sh            # pull, rebuild, restart, wait until healthy
+#   bash scripts/deploy/deploy.sh            # pull the code and the CI-built image, restart, wait until healthy
 #   bash scripts/deploy/deploy.sh --studies  # ... then load the three public demo studies
+#   bash scripts/deploy/deploy.sh --build    # build the image here instead (slow on 2 cores; if CI is down)
 #
 # First run: asks for the admin password once and stores only its scrypt hash in .env.
 set -euo pipefail
@@ -17,8 +18,12 @@ DOMAIN="$(env_value PHANTOM_DOMAIN)"
 echo "== pull"
 git pull --ff-only
 
-echo "== build"
-docker compose -f docker-compose.yml build api
+[ -n "$(env_value PHANTOM_IMAGE)" ] || { echo "PHANTOM_IMAGE is not set in .env." >&2; exit 1; }
+IMAGE="$(env_value PHANTOM_IMAGE):$(env_value PHANTOM_TAG)"; IMAGE="${IMAGE%:}"
+case " $* " in
+  *" --build "*) echo "== build (here, on the server)"; docker build -t "$IMAGE" -f docker/api/Dockerfile . ;;
+  *) echo "== pull $IMAGE"; docker pull "$IMAGE" ;;
+esac
 
 if [ -z "$(env_value PHANTOM_ADMIN_PASSWORD_HASH)" ]; then
   echo "== admin password (12+ characters; only its hash is stored)"
@@ -26,8 +31,8 @@ if [ -z "$(env_value PHANTOM_ADMIN_PASSWORD_HASH)" ]; then
   # prompts go to the terminal; the hash goes to a file (never echoed, never in shell history).
   TMP="$(mktemp -d)"
   trap 'rm -rf "$TMP"' EXIT
-  docker compose -f docker-compose.yml run --rm --no-deps -v "$TMP:/out" api \
-    sh -c 'python -m api.auth hash > /out/hash'
+  # the pulled image directly: the base compose file would build one if it were missing
+  docker run --rm -it -v "$TMP:/out" --entrypoint sh "$IMAGE" -c 'python -m api.auth hash > /out/hash'
   HASH="$(tr -d '\r\n' < "$TMP/hash")"
   case "$HASH" in scrypt:*) ;; *) echo "Could not create the password hash." >&2; exit 1 ;; esac
   sed -i '/^PHANTOM_ADMIN_PASSWORD_HASH=/d' .env
@@ -35,7 +40,7 @@ if [ -z "$(env_value PHANTOM_ADMIN_PASSWORD_HASH)" ]; then
 fi
 
 echo "== start"
-"${COMPOSE[@]}" up -d --build --remove-orphans
+"${COMPOSE[@]}" up -d --remove-orphans
 
 echo "== wait for health"
 for _ in $(seq 1 60); do
@@ -47,7 +52,7 @@ for _ in $(seq 1 60); do
 done
 "${COMPOSE[@]}" ps
 
-if [ "${1:-}" = "--studies" ]; then
+if [[ " $* " == *" --studies "* ]]; then
   echo "== load the three public demo studies (15-25 minutes the first time)"
   "${COMPOSE[@]}" exec -T api python scripts/load_demo_studies.py
 fi

@@ -10,8 +10,10 @@
 #      everything else; the VCN security list must ALSO allow 80/443, see DEPLOY.md)
 #   3. 4 GB swap (S8 peaks around 8 GB; swap is a cushion, not a plan)
 #   4. DuckDNS updater every 5 minutes
-#   5. .env: database/MinIO/de-identification secrets (scripts/setup-demo.sh), the domain and a
-#      session secret. The admin password is set by scripts/deploy/deploy.sh on its first run.
+#   5. .env: database/MinIO/de-identification secrets (scripts/setup-demo.sh), the domain, a
+#      session secret and the CI image name. The admin password is set by scripts/deploy/deploy.sh
+#      on its first run; the Groq key, if any, you add yourself.
+#   6. automatic security updates
 set -euo pipefail
 
 DOMAIN="${1:?usage: setup-server.sh <name>.duckdns.org <duckdns-token>}"
@@ -78,8 +80,21 @@ env_set() {  # adds KEY=VALUE only if KEY has no value yet
 }
 env_set PHANTOM_DOMAIN "$DOMAIN"
 env_set PHANTOM_SESSION_SECRET "$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')"
+# the api image CI publishes for this repository: ghcr.io/<GitHub owner>/phantom-api
+# as the repository owner: under sudo, git refuses a repository owned by someone else
+ORIGIN="$(sudo -u "$OWNER" git -C "$REPO" remote get-url origin 2>/dev/null || true)"
+GH_OWNER="$(printf '%s' "$ORIGIN" | sed -nE 's#.*github\.com[:/]([^/]+)/.*#\1#p' | tr '[:upper:]' '[:lower:]')"
+if [ -n "$GH_OWNER" ]; then env_set PHANTOM_IMAGE "ghcr.io/$GH_OWNER/phantom-api"
+else echo "   (could not read the GitHub owner from the git remote: set PHANTOM_IMAGE in .env)"; fi
 chown "$OWNER" .env && chmod 600 .env
 chmod 700 secrets
 
 echo
+echo "== automatic security updates"
+apt-get install -y unattended-upgrades >/dev/null
+cat > /etc/apt/apt.conf.d/20auto-upgrades <<'APT'
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+APT
+
 echo "Done. Log out and back in (docker group), then run:  bash scripts/deploy/deploy.sh"

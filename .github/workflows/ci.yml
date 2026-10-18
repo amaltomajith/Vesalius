@@ -18,6 +18,22 @@ permissions:
   contents: read
 
 jobs:
+  # a public repository: nothing secret and no medical image may ever be committed
+  hygiene:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: No keys, no scans
+        run: |
+          set -e
+          bad=0
+          if git grep -nIE 'gsk_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----' -- . ':!.github/workflows/ci.yml'; then
+            echo "::error::a key is committed"; bad=1
+          fi
+          if git ls-files | grep -iE '\.(dcm|nii|nii\.gz|nrrd|mha)$|(^|/)\.env$|^secrets/[^.]|^sample_data/|^real_scans/'; then
+            echo "::error::a scan, .env or secret file is committed"; bad=1
+          fi
+          exit $bad
   python:
     runs-on: ubuntu-24.04
     steps:
@@ -63,3 +79,48 @@ jobs:
         run: docker compose logs --no-color --tail 200
       - if: always()
         run: docker compose --profile test down -v
+
+  # the arm64 api image the server pulls (DEPLOY.md): GitHub's free native arm64 runner (public
+  # repositories), pushed to ghcr.io only from main, and only after it passes a smoke test
+  image:
+    runs-on: ubuntu-24.04-arm
+    needs: [hygiene, python, viewer]
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free disk space (the runner has 14 GB; the image is ~5 GB)
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build (arm64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/api/Dockerfile
+          platforms: linux/arm64
+          load: true
+          tags: phantom-api:ci
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/phantom-api:buildcache
+          cache-to: ${{ github.ref == 'refs/heads/main' && format('type=registry,ref=ghcr.io/{0}/phantom-api:buildcache,mode=max', github.repository_owner) || '' }}
+      - name: Smoke test (every heavy dependency imports on arm64; the unit tests pass in the image)
+        run: |
+          docker run --rm --entrypoint sh phantom-api:ci -c "
+            python -c 'import torch, torchvision, totalsegmentator, SimpleITK, fast_simplification, pydicom, pytesseract, trimesh, skimage; print(\"torch\", torch.__version__, torch.backends.cpu.get_cpu_capability())' &&
+            tesseract --version | head -1 &&
+            python -m pytest -q -m 'not integration and not ocr' tests/unit"
+      - name: Push to ghcr.io (main only)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          OWNER="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          for tag in latest "${GITHUB_SHA::12}"; do
+            docker tag phantom-api:ci "ghcr.io/$OWNER/phantom-api:$tag"
+            docker push "ghcr.io/$OWNER/phantom-api:$tag"
+          done
+

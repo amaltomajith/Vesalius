@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import {
   ArrowCounterClockwise, Check, CheckCircle, Clock, Cube, Database, DownloadSimple, FileText,
   FileZip, Play, UploadSimple, WarningOctagon, CornersOut,
@@ -32,7 +32,10 @@ const secs = (s: number | null) => (s == null ? '' : `${s.toFixed(1)} s`);
 /** Run a scan: the console, ported. Only the fields that matter right now are on screen. */
 export default function Pipeline() {
   const { toast } = useToast();
+  const canAct = useCanAct();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const wanted = params.get('dataset'); // the dashboard's Start: a sample (or 'upload') to preselect
   const [info, setInfo] = useState<Catalogue | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [panel, setPanel] = useState<Panel>('idle');
@@ -123,7 +126,9 @@ export default function Pipeline() {
         const c = await api<Catalogue>('/demo/datasets');
         if (!live) return;
         setInfo(c);
-        setSelected(c.datasets[0]?.key ?? null);
+        const pick = wanted === 'upload' || c.datasets.some((d) => d.key === wanted) ? wanted : c.datasets[0]?.key ?? null;
+        setSelected(pick);
+        if (pick === 'upload') setPanel('upload');
         if (c.busy && c.latest_run) {
           // resume following a scan only if the latest run is the thing still running
           const r = await api<Run>(`/demo/runs/${c.latest_run}`).catch(() => null);
@@ -133,7 +138,7 @@ export default function Pipeline() {
       } catch (e) { toast(e instanceof Error ? e.message : String(e)); }
     })();
     return () => { live = false; window.clearInterval(pollRef.current); };
-  }, [toast, watch]);
+  }, [toast, watch, wanted]);
 
   const choose = (key: string) => {
     if (busy) return;
@@ -185,30 +190,28 @@ export default function Pipeline() {
     setPanel(selected === 'upload' ? 'upload' : 'idle');
   };
 
-  const canAct = useCanAct();
   const dataset: Dataset | undefined = info?.datasets.find((d) => d.key === selected);
+  const locked = panel === 'run' || busy;
+
+  // a public showcase: no one but the admin can send it a scan (hard rule 1: never real patient data)
   if (!canAct) {
     return (
-      <div className="page">
-        <header className="page-head">
-          <div>
-            <p className="kicker mono">Run a scan</p>
-            <h1>Running the pipeline is for the admin</h1>
-            <p className="lede">
-              This is a public showcase: uploads and runs are switched off so that no one can send it a
-              real patient scan. Everything the pipeline has already published is open to explore.
-            </p>
+      <div className="page page--dash">
+        <section className="tile tile--wide gate-tile" data-testid="run-gate">
+          <h1>Running the pipeline is for the admin</h1>
+          <p className="tile-note">
+            This is a public showcase, so uploads and runs are switched off: no one can send it a real
+            patient scan. Everything the pipeline has already published is open to explore.
+          </p>
+          <div className="gate-tile__actions">
+            <Link className="btn btn-dark" to="/studies">Explore the studies</Link>
+            <Link className="btn" to="/body">The full body</Link>
+            <Link className="btn" to="/login?next=/pipeline" data-testid="gate-sign-in">Admin sign in</Link>
           </div>
-        </header>
-        <div className="chip-row">
-          <Link className="btn btn-primary" to="/studies">Explore the studies</Link>
-          <Link className="btn" to="/body">The full body</Link>
-          <Link className="btn" to="/login?next=/pipeline" data-testid="gate-sign-in">Admin sign in</Link>
-        </div>
+        </section>
       </div>
     );
   }
-  const locked = panel === 'run' || busy;
 
   return (
     <div className="page page--pipeline">

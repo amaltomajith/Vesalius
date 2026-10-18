@@ -6,7 +6,10 @@
 #   - Caddy is the only service with host ports (80/443); postgres, minio and the api lose theirs.
 #   - PHANTOM_PUBLIC=1: visitors can look, only the admin can upload, run or prove (src/api/auth.py).
 #   - Presigned gold URLs are signed for https://files.<domain>, which Caddy proxies to MinIO.
-#   - restart policies, memory limits, log rotation.
+#   - restart policies, memory limits, log rotation. Sized for Oracle's Always Free A1 as it is
+#     since 15 June 2026: 2 OCPU / 12 GB (was 4 / 24). Caddy 256m + postgres 1g + minio 1g + api 8g,
+#     leaving ~1.5 GB for the OS, plus 4 GB swap (setup-server.sh). One heavy job at a time
+#     (api/demo_state.HEAVY_LOCK), so one segmentation is the peak.
 # `!reset` needs Docker Compose v2.24+ (installed by scripts/deploy/setup-server.sh).
 
 x-logging: &logging
@@ -36,13 +39,13 @@ services:
   postgres:
     ports: !reset []
     restart: unless-stopped
-    mem_limit: 2g
+    mem_limit: 1g
     <<: *logging
 
   minio:
     ports: !reset []
     restart: unless-stopped
-    mem_limit: 2g
+    mem_limit: 1g
     <<: *logging
 
   minio-init:
@@ -52,6 +55,9 @@ services:
     <<: *logging
 
   api:
+    # the arm64 image CI builds on GitHub's free arm64 runners (.github/workflows/ci.yml, job
+    # `image`); scripts/deploy/deploy.sh pulls it (or builds it here with --build: 2 A1 cores are slow)
+    image: "${PHANTOM_IMAGE:?set PHANTOM_IMAGE in .env, e.g. ghcr.io/<you>/phantom-api}:${PHANTOM_TAG:-latest}"
     ports: !reset []
     restart: unless-stopped
     # --proxy-headers: the login rate limit is per client IP, and behind Caddy every request would
@@ -65,8 +71,10 @@ services:
       PHANTOM_SESSION_SECRET: "${PHANTOM_SESSION_SECRET:?set PHANTOM_SESSION_SECRET in .env}"
       MINIO_PUBLIC_ENDPOINT: files.${PHANTOM_DOMAIN}
       MINIO_PUBLIC_SECURE: "true"
-    # S8 (TotalSegmentator) peaks around 8 GB; the Always Free VM has 24 GB.
-    mem_limit: 16g
+    # S8 (TotalSegmentator) peaks around 8 GB; the VM has 12 GB and 4 GB swap. Measured on the VM
+    # after the first deploy (DEPLOY.md).
+    mem_limit: 8g
+    memswap_limit: 11g
     <<: *logging
 
 volumes:

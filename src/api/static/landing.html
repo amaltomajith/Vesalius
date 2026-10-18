@@ -4,8 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Phantom</title>
-  <meta name="description" content="A governed pipeline for clinical imaging. De-identifying DICOM metadata is not the same as de-identifying the output.">
+  <meta name="description" content="Phantom turns a CT scan into a labelled 3D body you steer with your hands. AI names every structure; nothing that identifies the patient survives.">
+  <meta name="theme-color" content="#060b09">
   <link rel="preload" href="/static/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/fonts/PlayfairDisplay-Italic.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/body/body.bin" as="fetch" crossorigin>
   <link rel="icon" type="image/svg+xml" href="/app/favicon.svg">
   <link rel="stylesheet" href="/static/base.css">
   <link rel="stylesheet" href="/static/landing.css">
@@ -18,10 +21,10 @@
         <span>Phantom</span>
       </a>
       <nav class="nav-links" aria-label="Sections">
-        <a href="#pipeline">How it works</a>
+        <a href="#story">How it works</a>
+        <a href="#uses">Where it helps</a>
         <a href="#proofs">Proofs</a>
         <a href="/app/body">Full body</a>
-        <a href="/docs">API docs</a>
       </nav>
       <a class="btn btn-primary btn-sm" href="/app/">Open Phantom
         <svg class="icon icon-nudge" aria-hidden="true"><use href="/static/icons.svg#i-arrow-right"></use></svg></a>
@@ -29,179 +32,168 @@
   </header>
 
   <main>
-    <div class="journey" id="pipeline">
+    <div class="journey" id="story">
       <div class="journey-pin">
-        <canvas id="scan-canvas" role="img" aria-label="A full-body anatomy atlas as a point cloud, with a real head CT on its shoulders. As you scroll the camera moves to the head, where the scan is received, stripped of names, and has its face cut away, then back out to the whole body as each body system is named."></canvas>
-        <p class="journey-fallback hidden" id="scan-fallback">This view needs WebGL. The story below is the same, told in words.</p>
+        <canvas id="hall-canvas" role="img" aria-label="An anatomy statue on a pedestal in a dark hall of columns. As you scroll, the camera walks in: a scanner ring reads the statue into slices, its identity is stripped and the face cut, the slices close up again, the marble dissolves to show every labelled structure inside, and a hand turns the figure."></canvas>
+        <p class="journey-fallback hidden" id="hall-fallback">This view needs WebGL. The story below is the same, told in words.</p>
+
+        <!-- things in the scene that carry words: positioned by hall-scene.js, text set here -->
+        <div class="overlays" aria-hidden="true">
+          <!-- the identity in a scan's header, pinned to the head, then stripped -->
+          <div class="tag3d id" data-anchor="id-name" data-lane="-190,-70"><i></i><b></b><span><small class="mono">(0010,0010)</small>Patient name<s></s></span></div>
+          <div class="tag3d id" data-anchor="id-date" data-lane="-210,-26"><i></i><b></b><span><small class="mono">(0008,0020)</small>Study date<s></s></span></div>
+          <div class="tag3d id" data-anchor="id-id" data-lane="-230,14"><i></i><b></b><span><small class="mono">(0010,0020)</small>Patient ID<s></s></span></div>
+          <div class="tag3d id" data-anchor="id-birth" data-lane="-220,52"><i></i><b></b><span><small class="mono">(0010,0030)</small>Birth date<s></s></span></div>
+          <div class="tag3d id" data-anchor="id-site" data-lane="-190,92"><i></i><b></b><span><small class="mono">(0008,0080)</small>Institution<s></s></span></div>
+          <div class="tag3d" data-anchor="Skull" data-system="skeleton" data-lane="-110,-8"><i></i><b></b><span>Skull</span></div>
+          <div class="tag3d" data-anchor="Humerus" data-system="skeleton" data-lane="-90,6"><i></i><b></b><span>Humerus</span></div>
+          <div class="tag3d" data-anchor="Pelvis" data-system="skeleton" data-lane="120,4"><i></i><b></b><span>Pelvis</span></div>
+          <div class="tag3d" data-anchor="Femur" data-system="skeleton" data-lane="110,18"><i></i><b></b><span>Femur</span></div>
+          <div class="tag3d" data-anchor="Tibia" data-system="skeleton" data-lane="-100,0"><i></i><b></b><span>Tibia</span></div>
+          <div class="tag3d" data-anchor="Heart" data-system="vessels" data-lane="150,-38"><i></i><b></b><span>Heart</span></div>
+          <div class="tag3d" data-anchor="Aorta" data-system="vessels" data-lane="170,0"><i></i><b></b><span>Aorta</span></div>
+          <div class="tag3d" data-anchor="Lungs" data-system="organs" data-lane="-170,-40"><i></i><b></b><span>Lungs</span></div>
+          <div class="tag3d" data-anchor="Liver" data-system="organs" data-lane="-150,12"><i></i><b></b><span>Liver</span></div>
+          <div class="tag3d" data-anchor="Stomach" data-system="organs" data-lane="160,36"><i></i><b></b><span>Stomach</span></div>
+          <div class="tag3d" data-anchor="Colon" data-system="organs" data-lane="-140,46"><i></i><b></b><span>Colon</span></div>
+          <div class="gesture" id="gesture">
+            <span data-g="turn">Pinch and drag <b>turn</b></span>
+            <span data-g="select">Point and hold <b>select</b></span>
+            <span data-g="clear">Other hand sweep <b>clear</b></span>
+          </div>
+        </div>
 
         <section class="hero-layer wrap" data-layer="hero" aria-labelledby="hero-h">
-          <div class="hero-copy">
-            <p class="eyebrow">Governed clinical imaging pipeline</p>
-            <h1 id="hero-h">Clean tags.<br><span class="accent-line">Still a face.</span></h1>
-            <p class="lede">Scrubbing DICOM metadata does not de-identify the output. This pipeline gates the 3D mesh too, and proves it.</p>
-            <div class="cta-row">
-              <a class="btn btn-primary" href="/app/">Open Phantom
-                <svg class="icon icon-nudge" aria-hidden="true"><use href="/static/icons.svg#i-arrow-right"></use></svg></a>
-              <a class="btn btn-ghost" href="#pipeline" data-seek="1">How it works</a>
-            </div>
-          </div>
-          <div class="hero-meta">
-            <div class="toggle levels" role="group" aria-label="Body systems shown">
-              <button type="button" aria-pressed="true" data-system="0"><span class="dot dot-bone"></span>Skeleton</button>
-              <button type="button" aria-pressed="true" data-system="1"><span class="dot dot-vessel"></span>Vessels</button>
-              <button type="button" aria-pressed="true" data-system="2"><span class="dot dot-nerve"></span>Nerves</button>
-            </div>
-            <p class="hero-credit">A full-body anatomy atlas with a real head CT on its shoulders. Scroll, and follow that scan through the pipeline. Drag to look around.</p>
+          <h1 id="hero-h">Anatomy you can <em>walk around.</em></h1>
+          <p class="lede">A CT scan becomes a labelled 3D body you steer with your hands. AI names every bone, organ and vessel.</p>
+          <div class="cta-row">
+            <a class="btn btn-primary" href="/app/">Open Phantom
+              <svg class="icon icon-nudge" aria-hidden="true"><use href="/static/icons.svg#i-arrow-right"></use></svg></a>
+            <a class="btn btn-ghost" href="#story" data-seek>How it works</a>
           </div>
         </section>
 
         <div class="chapter-layer wrap">
-          <article class="chapter" data-ch="1" aria-labelledby="ch1-h">
-            <p class="ch-num mono">01</p>
-            <h2 id="ch1-h">Received, untouched</h2>
-            <p>The scan arrives as a stack of slices and is stored exactly as received. It is catalogued, then checked: the slices are ordered by where they sit in the body, not by their numbers. A broken series is quarantined, never repaired.</p>
-            <p class="ch-stages mono">S1 Ingest · S2 Index · S3 Quality gate</p>
+          <article class="chapter" data-ch="scan" aria-labelledby="ch-scan-h">
+            <h2 id="ch-scan-h">It starts with <em>a scan.</em></h2>
+            <p>A CT arrives as a stack of DICOM slices, the format every hospital scanner already writes. Phantom reads them exactly as they come.</p>
           </article>
-          <article class="chapter" data-ch="2" aria-labelledby="ch2-h">
-            <p class="ch-num mono">02</p>
-            <h2 id="ch2-h">Names removed</h2>
-            <p>Names, IDs and dates are stripped from every header, and so are private vendor fields and any text burned into the pixels. A second, independent pass checks that nothing survived. Unverified data goes no further.</p>
-            <p class="ch-stages mono">S4 De-identify · S5 Verify, a hard gate</p>
+          <article class="chapter" data-ch="privacy" aria-labelledby="ch-privacy-h">
+            <h2 id="ch-privacy-h">Private <em>by construction.</em></h2>
+            <p>Names, IDs, dates and the face are stripped before anything is rebuilt. The slices are then reassembled into one volume: the anatomy survives, the identity does not.</p>
           </article>
-          <article class="chapter" data-ch="3" aria-labelledby="ch3-h">
-            <p class="ch-num mono">03</p>
-            <h2 id="ch3-h">The face comes off</h2>
-            <p>The slices become one volume, and the face is cut away before any surface exists. A head without a verified cut never reaches 3D, however clean its tags are.</p>
-            <p class="ch-stages mono">S6 Volume · S7 Deface, a hard gate</p>
+          <article class="chapter" data-ch="ai" aria-labelledby="ch-ai-h">
+            <h2 id="ch-ai-h">AI names <em>every structure.</em></h2>
+            <p>A segmentation model that knows 117 anatomical structures labels every bone, organ and vessel it finds, in place, in 3D.</p>
+            <p class="impact">Learning that from flat textbook plates takes months. Here you walk around it.</p>
           </article>
-          <article class="chapter" data-ch="4" aria-labelledby="ch4-h">
-            <p class="ch-num mono">04</p>
-            <h2 id="ch4-h">Every structure, named</h2>
-            <p>Each organ, bone and vessel is found and named, meshed on its own, and exported with its measurements and the record of every step that made it.</p>
-            <p class="ch-stages mono">S8 Segment · S9 Surface · S10 Mesh · S11 Export</p>
-          </article>
-          <article class="chapter" data-ch="5" aria-labelledby="ch5-h">
-            <p class="ch-num mono">05</p>
-            <h2 id="ch5-h">Served, and proven</h2>
-            <p>Only the gold copy is ever served, through a read-only role that cannot see anything else. Five automated proofs try to break these promises, on this machine.</p>
-            <p class="ch-stages mono">S12 Serve</p>
+          <article class="chapter" data-ch="hands" aria-labelledby="ch-hands-h">
+            <h2 id="ch-hands-h">Steer it with <em>your hands.</em></h2>
+            <p>Your webcam tracks 21 points on each hand. Pinch and drag to turn, point at a part and hold to select it, sweep your other hand to clear the rest away. The video never leaves your browser.</p>
             <div class="cta-row">
               <a class="btn btn-primary" href="/app/">Open Phantom
                 <svg class="icon icon-nudge" aria-hidden="true"><use href="/static/icons.svg#i-arrow-right"></use></svg></a>
-              <a class="btn btn-ghost" href="#proofs">See the proofs</a>
             </div>
           </article>
         </div>
 
-        <nav class="ribbon wrap" aria-label="The twelve pipeline stages">
-          <div class="ribbon-track" aria-hidden="true"><span class="ribbon-fill" id="ribbon-fill"></span></div>
-          <ol class="ribbon-stages" id="ribbon">
-            <li data-zone="bronze"><button type="button" data-stage="S1" title="S1 Ingest"><span class="rs-code mono">S1</span><span class="rs-name">Ingest</span></button></li>
-            <li data-zone="bronze"><button type="button" data-stage="S2" title="S2 Index"><span class="rs-code mono">S2</span><span class="rs-name">Index</span></button></li>
-            <li data-zone="bronze"><button type="button" data-stage="S3" title="S3 Quality gate"><span class="rs-code mono">S3</span><span class="rs-name">Quality gate</span></button></li>
-            <li data-zone="bronze"><button type="button" data-stage="S4" title="S4 De-identify"><span class="rs-code mono">S4</span><span class="rs-name">De-identify</span></button></li>
-            <li data-zone="silver" data-gate><button type="button" data-stage="S5" title="S5 Verify"><span class="rs-code mono">S5</span><span class="rs-name">Verify</span><svg class="icon rs-lock" aria-hidden="true"><use href="/static/icons.svg#i-lock-simple"></use></svg></button></li>
-            <li data-zone="silver"><button type="button" data-stage="S6" title="S6 Volume"><span class="rs-code mono">S6</span><span class="rs-name">Volume</span></button></li>
-            <li data-zone="silver" data-gate><button type="button" data-stage="S7" title="S7 Deface"><span class="rs-code mono">S7</span><span class="rs-name">Deface</span><svg class="icon rs-lock" aria-hidden="true"><use href="/static/icons.svg#i-lock-simple"></use></svg></button></li>
-            <li data-zone="silver"><button type="button" data-stage="S8" title="S8 Segment"><span class="rs-code mono">S8</span><span class="rs-name">Segment</span></button></li>
-            <li data-zone="silver"><button type="button" data-stage="S9" title="S9 Surface"><span class="rs-code mono">S9</span><span class="rs-name">Surface</span></button></li>
-            <li data-zone="silver"><button type="button" data-stage="S10" title="S10 Mesh"><span class="rs-code mono">S10</span><span class="rs-name">Mesh</span></button></li>
-            <li data-zone="gold"><button type="button" data-stage="S11" title="S11 Export"><span class="rs-code mono">S11</span><span class="rs-name">Export</span></button></li>
-            <li data-zone="gold"><button type="button" data-stage="S12" title="S12 Serve"><span class="rs-code mono">S12</span><span class="rs-name">Serve</span></button></li>
-          </ol>
-          <div class="ribbon-zones mono" aria-hidden="true"><span>Bronze</span><span>Silver</span><span>Gold</span></div>
-        </nav>
+        <ol class="beats wrap" aria-label="The story so far">
+          <li data-beat="scan">Scan</li>
+          <li data-beat="privacy">Privacy</li>
+          <li data-beat="ai">AI labels</li>
+          <li data-beat="hands">Hands</li>
+        </ol>
       </div>
     </div>
 
-    <section class="thesis" aria-labelledby="thesis-h">
-      <div class="wrap reveal">
-      <h2 id="thesis-h">A surface mesh from a head CT is a recognisable face. The pipeline creates that channel, so the pipeline has to close it.</h2>
-      <dl class="facts">
-        <div><dt class="mono">3</dt><dd>de-identification channels: standard tags, private tags, burned-in pixels</dd></div>
-        <div><dt class="mono">2</dt><dd>hard gates that fail closed: verification before silver, defacing before any mesh</dd></div>
-        <div><dt class="mono">12</dt><dd>stages, each writing a transform run, including skips and failures</dd></div>
-      </dl>
+    <section class="uses wrap" id="uses" aria-labelledby="uses-h">
+      <h2 id="uses-h" class="section-h reveal">Where it <em>helps.</em></h2>
+      <div class="use-grid">
+        <article class="use reveal">
+          <p class="use-n mono">01</p>
+          <div class="use-mark" aria-hidden="true"><span class="use-dash"></span><span class="use-circle"></span></div>
+          <h3>Surgical <em>planning</em></h3>
+          <p>Walk around the patient's own anatomy before the first incision, with every structure named and measured.</p>
+        </article>
+        <article class="use reveal">
+          <p class="use-n mono">02</p>
+          <div class="use-mark" aria-hidden="true"><span class="use-dash"></span><span class="use-circle"></span></div>
+          <h3>Patient <em>conversations</em></h3>
+          <p>Show people their scan as a body they recognise, not a stack of grey slices.</p>
+        </article>
+        <article class="use reveal">
+          <p class="use-n mono">03</p>
+          <div class="use-mark" aria-hidden="true"><span class="use-dash"></span><span class="use-circle"></span></div>
+          <h3>Teaching <em>anatomy</em></h3>
+          <p>Students explore labelled anatomy from real scans in 3D, instead of memorising flat plates.</p>
+        </article>
+        <article class="use reveal">
+          <p class="use-n mono">04</p>
+          <div class="use-mark" aria-hidden="true"><span class="use-dash"></span><span class="use-circle"></span></div>
+          <h3>Research <em>you can share</em></h3>
+          <p>De-identified by construction, so a study can leave the hospital for teaching and research.</p>
+        </article>
       </div>
     </section>
 
-    <section id="proofs" class="proofs wrap" aria-labelledby="proofs-h">
-      <h2 id="proofs-h" class="section-h reveal">Claims are cheap. These are tests.</h2>
-      <p class="section-sub reveal">Five automated tests, each trying to break one promise. Run any of them in the app; each verdict below shows its latest run on this machine.</p>
-      <div class="bento" id="proof-bento">
-        <article class="cell cell-feature reveal" data-proof="face">
-          <div class="cell-media" id="proof-media">
-            <img id="proof-img" alt="Sagittal view of the same synthetic head with and without defacing" class="hidden">
-            <div class="media-empty" id="proof-empty">
-              <svg class="icon" aria-hidden="true"><use href="/static/icons.svg#i-eye-slash"></use></svg>
-              <p class="me-title">Not run on this machine yet</p>
-              <p>This test builds a synthetic head and tries to make a 3D surface without removing the face. The pipeline must refuse. It then runs normally, and the picture of the head with and without its face appears here.</p>
-              <a class="btn btn-sm" href="/app/proofs">Run it in the app
-                <svg class="icon icon-nudge" aria-hidden="true"><use href="/static/icons.svg#i-arrow-right"></use></svg></a>
-              <small>Takes about 90 seconds</small>
+    <!-- one pinned stage: the glow floods in, the vow sharpens, then the proof tickets fly in -->
+    <section class="vow" id="proofs" aria-labelledby="vow-h">
+      <div class="vow-stage">
+        <div class="vow-glow" aria-hidden="true"></div>
+        <h2 id="vow-h" class="vow-h">
+          <span class="vow-line"><span class="sans">The scan stays</span> <em>private.</em></span>
+          <span class="vow-line"><span class="sans">The anatomy stays</span> <em>real.</em></span>
+        </h2>
+        <div class="tickets">
+          <article class="ticket" data-proof="face">
+            <div class="ticket-top">
+              <svg class="icon ticket-icon" aria-hidden="true"><use href="/static/icons.svg#i-eye-slash"></use></svg>
+              <h3>The face never reaches <em>a mesh</em></h3>
+              <p>Skip defacing on a head scan and the pipeline refuses to build a surface.</p>
             </div>
-          </div>
-          <div class="cell-body">
-            <div class="cell-head"><h3>The face never reaches a mesh</h3><span class="chip" data-verdict>not run yet</span></div>
-            <p>Skipping defacing on a head, or swapping the defaced volume back, is refused at the gate.</p>
-          </div>
-        </article>
-        <article class="cell tint-mint reveal" data-proof="privacy">
-          <svg class="icon cell-icon" aria-hidden="true"><use href="/static/icons.svg#i-fingerprint"></use></svg>
-          <div class="cell-head"><h3>Planted identifiers are removed</h3><span class="chip" data-verdict>not run yet</span></div>
-          <p>Fake names, IDs, dates and burned-in text are planted in a scan. The check counts what survives.</p>
-        </article>
-        <article class="cell tint-sand reveal" data-proof="rebuild">
-          <svg class="icon cell-icon" aria-hidden="true"><use href="/static/icons.svg#i-arrow-counter-clockwise"></use></svg>
-          <div class="cell-head"><h3>Gold rebuilds byte for byte</h3><span class="chip" data-verdict>not run yet</span></div>
-          <p>Wipe the servable outputs, rebuild them in a fresh process, compare hashes.</p>
-        </article>
-        <article class="cell tint-bone reveal" data-proof="contract">
-          <svg class="icon cell-icon" aria-hidden="true"><use href="/static/icons.svg#i-shield-check"></use></svg>
-          <div class="cell-head"><h3>Consumers refuse a broken contract</h3><span class="chip" data-verdict>not run yet</span></div>
-          <p>A new format that quietly flips left and right is published. The downstream reader refuses it.</p>
-        </article>
-        <article class="cell cell-wide tint-mint reveal" data-proof="viewer">
-          <svg class="icon cell-icon" aria-hidden="true"><use href="/static/icons.svg#i-cube"></use></svg>
-          <div class="cell-head"><h3>The 3D viewer never shows a face</h3><span class="chip" data-verdict>not run yet</span></div>
-          <p>A head study is loaded exactly the way the viewer loads it. No named structure, bone included, reaches the face region, and the viewer refuses any study whose face was not removed. <a href="/viewer/">Open the viewer</a></p>
-        </article>
-      </div>
-    </section>
-
-    <section class="rules wrap" aria-labelledby="rules-h">
-      <h2 id="rules-h" class="section-h reveal">What the pipeline will not do</h2>
-      <div class="rule-groups">
-        <div class="rule-group reveal">
-          <h3><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#i-database"></use></svg>Data</h3>
-          <ul>
-            <li><b>Rewrite bronze.</b> Raw files are write-once and content-addressed.</li>
-            <li><b>Drop a record.</b> Rejected series are quarantined with a reason and a row.</li>
-            <li><b>Serve anything but gold.</b> Original IDs live in a schema the serving role cannot read.</li>
-          </ul>
+            <div class="ticket-stub">
+              <p class="stub-row mono"><span>Latest verdict</span><span class="chip" data-verdict>not run yet</span></p>
+              <p class="stub-file mono">tests/proofs/test_defacing_gate.py</p>
+            </div>
+          </article>
+          <article class="ticket" data-proof="privacy">
+            <div class="ticket-top">
+              <svg class="icon ticket-icon" aria-hidden="true"><use href="/static/icons.svg#i-fingerprint"></use></svg>
+              <h3>Planted identifiers are <em>removed</em></h3>
+              <p>Fake names, IDs, dates and burned-in text go into a scan. The check counts what survives.</p>
+            </div>
+            <div class="ticket-stub">
+              <p class="stub-row mono"><span>Latest verdict</span><span class="chip" data-verdict>not run yet</span></p>
+              <p class="stub-file mono">tests/proofs/test_phi_injection.py</p>
+            </div>
+          </article>
+          <article class="ticket" data-proof="viewer">
+            <div class="ticket-top">
+              <svg class="icon ticket-icon" aria-hidden="true"><use href="/static/icons.svg#i-cube"></use></svg>
+              <h3>The 3D viewer never shows <em>a face</em></h3>
+              <p>A head study, loaded exactly as the viewer loads it, has nothing in the face region.</p>
+            </div>
+            <div class="ticket-stub">
+              <p class="stub-row mono"><span>Latest verdict</span><span class="chip" data-verdict>not run yet</span></p>
+              <p class="stub-file mono">tests/proofs/test_head_study_has_no_face.py</p>
+            </div>
+          </article>
         </div>
-        <div class="rule-group reveal">
-          <h3><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#i-cube"></use></svg>Geometry</h3>
-          <ul>
-            <li><b>Warn instead of refuse.</b> The defacing gate fails closed.</li>
-            <li><b>Repair bad geometry.</b> No interpolated slices, no forced spacing.</li>
-            <li><b>Forget how it got here.</b> Every output traces back through recorded, versioned runs.</li>
-          </ul>
-        </div>
+        <a class="more" href="/app/proofs">Run all five proofs
+          <svg class="icon icon-nudge" aria-hidden="true"><use href="/static/icons.svg#i-arrow-right"></use></svg></a>
       </div>
-    </section>
-
-    <section class="closing wrap reveal">
-      <h2>Run a scan through it.</h2>
-      <p>Synthetic head and chest CTs are built in. Everything stays on this machine.</p>
-      <a class="btn btn-primary" href="/app/pipeline">Run a scan
-        <svg class="icon icon-nudge" aria-hidden="true"><use href="/static/icons.svg#i-arrow-right"></use></svg></a>
     </section>
   </main>
 
-  <footer class="foot wrap">
-    <p>Head CT: 3D Slicer sample data (CT-MR Brain), donated for unrestricted use; face removed by this pipeline. Body atlas: derived from Z-Anatomy (CC-BY-SA 4.0) and BodyParts3D, The Database Center for Life Science (CC-BY-SA 2.1 Japan); the derived point cloud is CC-BY-SA 4.0, <a href="/static/atlas/CREDITS.txt">credits</a>. The built-in demo scans are synthetic. Nothing here is evidence about clinical accuracy.</p>
-    <nav aria-label="Footer"><a href="/app/">App</a><a href="/app/body">Full body</a><a href="/docs">API docs</a></nav>
+  <footer class="foot">
+    <div class="foot-cta wrap">
+      <a class="diamond" href="/app/"><span>Open Phantom</span></a>
+    </div>
+    <div class="foot-row wrap">
+      <p class="foot-credit">Anatomy statue: derived from Z-Anatomy (CC-BY-SA 4.0) and BodyParts3D, The Database Center for Life Science (CC-BY-SA 2.1 Japan); the derived meshes are CC-BY-SA 4.0, <a href="/static/body/CREDITS.txt">credits</a>. The built-in demo scans are synthetic. Nothing here is evidence about clinical accuracy.</p>
+      <nav aria-label="Footer"><a href="/app/">App</a><a href="/app/body">Full body</a><a href="/docs">API docs</a></nav>
+    </div>
+    <p class="wordmark" aria-hidden="true">PHANTOM</p>
   </footer>
   <script type="module" src="/static/landing.js"></script>
 </body>

@@ -69,10 +69,15 @@ export default function SystemLayer({ url, color, emissive, visible, onLoaded, h
       if (!(child as THREE.Mesh).isMesh) return;
       const mesh = child as THREE.Mesh;
 
+      // the room redesign (2026-10-18): a lit anatomical surface (the hall's environment map gives
+      // it real specular) with only a whisper of its own colour as glow; selection raises it
       const mat = new THREE.MeshStandardMaterial({
         color:            new THREE.Color(color),
         emissive:         new THREE.Color(emissive),
-        emissiveIntensity: 0.3,
+        emissiveIntensity: 0.04,
+        roughness:        0.5,
+        metalness:        0,
+        envMapIntensity:  0.9,
         transparent:      true,
         opacity:          0.75,
         depthWrite:       false,
