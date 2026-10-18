@@ -43,7 +43,7 @@ ServingSession = Annotated[Session, Depends(serving_session_dependency)]
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 # Groq sits behind Cloudflare, which refuses Python's default urllib user agent with a 403
 # ("error code: 1010", found live 2026-10-18): every request names this app instead.
-USER_AGENT = "phantom-viewer/1.0"
+USER_AGENT = "vesalius-viewer/1.0"
 # Groq retires models (2026-10-18: llama-3.3-70b-versatile and llama-4-scout were gone, every
 # call 404'd). Defaults from its live /models list: a text model, and the one chat model that
 # takes images (for the atlas snapshot). Both answered in full within the 260-token cap.

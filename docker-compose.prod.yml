@@ -4,7 +4,7 @@
 #
 # What it changes:
 #   - Caddy is the only service with host ports (80/443); postgres, minio and the api lose theirs.
-#   - PHANTOM_PUBLIC=1: visitors can look, only the admin can upload, run or prove (src/api/auth.py).
+#   - VESALIUS_PUBLIC=1: visitors can look, only the admin can upload, run or prove (src/api/auth.py).
 #   - Presigned gold URLs are signed for https://files.<domain>, which Caddy proxies to MinIO.
 #   - restart policies, memory limits, log rotation. Sized for Oracle's Always Free A1 as it is
 #     since 15 June 2026: 2 OCPU / 12 GB (was 4 / 24). Caddy 256m + postgres 1g + minio 1g + api 8g,
@@ -28,7 +28,7 @@ services:
         condition: service_healthy
     ports: ["80:80", "443:443", "443:443/udp"]
     environment:
-      PHANTOM_DOMAIN: "${PHANTOM_DOMAIN:?set PHANTOM_DOMAIN in .env}"
+      VESALIUS_DOMAIN: "${VESALIUS_DOMAIN:?set VESALIUS_DOMAIN in .env}"
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -57,7 +57,7 @@ services:
   api:
     # the arm64 image CI builds on GitHub's free arm64 runners (.github/workflows/ci.yml, job
     # `image`); scripts/deploy/deploy.sh pulls it (or builds it here with --build: 2 A1 cores are slow)
-    image: "${PHANTOM_IMAGE:?set PHANTOM_IMAGE in .env, e.g. ghcr.io/<you>/phantom-api}:${PHANTOM_TAG:-latest}"
+    image: "${VESALIUS_IMAGE:?set VESALIUS_IMAGE in .env, e.g. ghcr.io/<you>/vesalius-api}:${VESALIUS_TAG:-latest}"
     ports: !reset []
     restart: unless-stopped
     # --proxy-headers: the login rate limit is per client IP, and behind Caddy every request would
@@ -66,10 +66,10 @@ services:
     command: ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000",
               "--proxy-headers", "--forwarded-allow-ips", "*"]
     environment:
-      PHANTOM_PUBLIC: "1"
-      PHANTOM_ADMIN_PASSWORD_HASH: "${PHANTOM_ADMIN_PASSWORD_HASH:?set it with scripts/deploy/setup-server.sh}"
-      PHANTOM_SESSION_SECRET: "${PHANTOM_SESSION_SECRET:?set PHANTOM_SESSION_SECRET in .env}"
-      MINIO_PUBLIC_ENDPOINT: files.${PHANTOM_DOMAIN}
+      VESALIUS_PUBLIC: "1"
+      VESALIUS_ADMIN_PASSWORD_HASH: "${VESALIUS_ADMIN_PASSWORD_HASH:?set it with scripts/deploy/setup-server.sh}"
+      VESALIUS_SESSION_SECRET: "${VESALIUS_SESSION_SECRET:?set VESALIUS_SESSION_SECRET in .env}"
+      MINIO_PUBLIC_ENDPOINT: files.${VESALIUS_DOMAIN}
       MINIO_PUBLIC_SECURE: "true"
     # S8 (TotalSegmentator) peaks around 8 GB; the VM has 12 GB and 4 GB swap. Measured on the VM
     # after the first deploy (DEPLOY.md).

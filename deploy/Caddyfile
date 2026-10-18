@@ -1,8 +1,8 @@
-# Phantom in production: the only thing listening on the internet (ports 80/443).
+# Vesalius in production: the only thing listening on the internet (ports 80/443).
 # Caddy gets and renews the Let's Encrypt certificates on its own.
 #
-#   {$PHANTOM_DOMAIN}        -> the api (landing, /app, /studies, /docs, ...)
-#   files.{$PHANTOM_DOMAIN}  -> MinIO, GET/HEAD on the gold bucket only (presigned downloads).
+#   {$VESALIUS_DOMAIN}        -> the api (landing, /app, /studies, /docs, ...)
+#   files.{$VESALIUS_DOMAIN}  -> MinIO, GET/HEAD on the gold bucket only (presigned downloads).
 #                               Bronze, silver and quarantine are never reachable (CLAUDE.md rule 3),
 #                               and neither is the MinIO console.
 (security_headers) {
@@ -16,7 +16,7 @@
 	}
 }
 
-{$PHANTOM_DOMAIN} {
+{$VESALIUS_DOMAIN} {
 	import security_headers
 	encode zstd gzip
 
@@ -35,12 +35,12 @@
 	# React and three.js set style attributes. Gold files come from files.<domain> (presigned
 	# redirects), and GLB textures are decoded through blob: URLs.
 	@app not path /docs /docs/* /redoc /redoc/*
-	header @app Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://files.{$PHANTOM_DOMAIN}; connect-src 'self' blob: data: https://files.{$PHANTOM_DOMAIN}; worker-src 'self' blob:; media-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+	header @app Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://files.{$VESALIUS_DOMAIN}; connect-src 'self' blob: data: https://files.{$VESALIUS_DOMAIN}; worker-src 'self' blob:; media-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 
 	reverse_proxy api:8000
 }
 
-files.{$PHANTOM_DOMAIN} {
+files.{$VESALIUS_DOMAIN} {
 	import security_headers
 
 	# The Host header must reach MinIO unchanged: it is part of the presigned signature

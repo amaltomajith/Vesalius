@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # One-time setup of a fresh Ubuntu 24.04 server (Oracle Cloud Always Free Ampere A1, ARM64) for
-# the public Phantom showcase. Run it from the cloned repository, as a sudo-capable user:
+# the public Vesalius showcase. Run it from the cloned repository, as a sudo-capable user:
 #
-#   sudo bash scripts/deploy/setup-server.sh phantom-yourname.duckdns.org <duckdns-token>
+#   sudo bash scripts/deploy/setup-server.sh vesalius-yourname.duckdns.org <duckdns-token>
 #
 # Idempotent: safe to run again. It never overwrites an existing .env value or secret file.
 #   1. Docker Engine + the Compose plugin (Docker's own apt repository)
@@ -78,14 +78,14 @@ env_set() {  # adds KEY=VALUE only if KEY has no value yet
     printf '%s=%s\n' "$1" "$2" >> .env
   fi
 }
-env_set PHANTOM_DOMAIN "$DOMAIN"
-env_set PHANTOM_SESSION_SECRET "$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')"
-# the api image CI publishes for this repository: ghcr.io/<GitHub owner>/phantom-api
+env_set VESALIUS_DOMAIN "$DOMAIN"
+env_set VESALIUS_SESSION_SECRET "$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')"
+# the api image CI publishes for this repository: ghcr.io/<GitHub owner>/vesalius-api
 # as the repository owner: under sudo, git refuses a repository owned by someone else
 ORIGIN="$(sudo -u "$OWNER" git -C "$REPO" remote get-url origin 2>/dev/null || true)"
 GH_OWNER="$(printf '%s' "$ORIGIN" | sed -nE 's#.*github\.com[:/]([^/]+)/.*#\1#p' | tr '[:upper:]' '[:lower:]')"
-if [ -n "$GH_OWNER" ]; then env_set PHANTOM_IMAGE "ghcr.io/$GH_OWNER/phantom-api"
-else echo "   (could not read the GitHub owner from the git remote: set PHANTOM_IMAGE in .env)"; fi
+if [ -n "$GH_OWNER" ]; then env_set VESALIUS_IMAGE "ghcr.io/$GH_OWNER/vesalius-api"
+else echo "   (could not read the GitHub owner from the git remote: set VESALIUS_IMAGE in .env)"; fi
 chown "$OWNER" .env && chmod 600 .env
 chmod 700 secrets
 

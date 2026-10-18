@@ -110,7 +110,7 @@ SCRIPTS = _own(".js")
 
 
 def test_the_scans_cover_the_landing_page() -> None:
-    # the console became the Phantom app (viewer/, scanned by test_viewer_serving.py)
+    # the console became the Vesalius app (viewer/, scanned by test_viewer_serving.py)
     names = {p.name for p in PAGE_FILES}
     assert {"landing.html", "landing.js", "hall-scene.js", "icons.svg"} <= names
     assert {p.name for p in SCRIPTS} >= {"landing.js", "hall-scene.js"}

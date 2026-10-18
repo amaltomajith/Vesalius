@@ -43,7 +43,7 @@ def _json(path: str) -> Any:
 
 def _admin_cookie() -> dict[str, str]:
     """On a public deployment uploads are admin-only (src/api/auth.py). This script runs inside the
-    api container, which holds PHANTOM_SESSION_SECRET, so it signs its own short admin session
+    api container, which holds VESALIUS_SESSION_SECRET, so it signs its own short admin session
     instead of needing the password. Locally (not public) no cookie is needed or sent."""
     from api import auth
 

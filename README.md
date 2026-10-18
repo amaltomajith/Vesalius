@@ -1,4 +1,4 @@
-# Phantom
+# Vesalius
 
 Turns medical scans into 3D models that are safe to share, and proves it.
 
@@ -47,7 +47,7 @@ Stop with `docker compose down`. Wipe everything with `docker compose down --vol
 
 ## What to try
 
-The landing page (`/`) tells the story; **Open Phantom** goes to the app (`/app`), where everything
+The landing page (`/`) tells the story; **Open Vesalius** goes to the app (`/app`), where everything
 else lives:
 
 | Screen | Address | What it does |
@@ -147,7 +147,7 @@ CLI: `python -m pipeline.cli ingest --source my-upload path/to/archive.zip`, the
 ```bash
 cd viewer
 npm ci
-npm run dev      # http://localhost:5173/app/, proxies the API (PHANTOM_API, default :8001)
+npm run dev      # http://localhost:5173/app/, proxies the API (VESALIUS_API, default :8001)
 npm test         # vitest: mesh-contract validation (studies, atlas, surfaces), layers, anatomy lookup
 npm run build    # the Docker image does this in its Node stage and serves it at /app/
 ```

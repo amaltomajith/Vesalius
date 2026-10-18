@@ -1,7 +1,7 @@
 """Public mode and the single admin login (deployment).
 
-Locally (``PHANTOM_PUBLIC`` unset) nothing changes: the demo is bound to 127.0.0.1 and every route
-is open, as before. On a public deployment (``PHANTOM_PUBLIC=1``) everyone can LOOK (landing,
+Locally (``VESALIUS_PUBLIC`` unset) nothing changes: the demo is bound to 127.0.0.1 and every route
+is open, as before. On a public deployment (``VESALIUS_PUBLIC=1``) everyone can LOOK (landing,
 app, studies, atlas, gold files, lineage, reports, proof verdicts), and only the admin can DO
 anything: upload a scan, start a run, run a proof, ingest. Public uploads are off because this
 project must never receive real patient data (CLAUDE.md hard rule 1). The one exception is the AI
@@ -10,7 +10,7 @@ explanations (user decision 2026-10-18): open to visitors, limited per client IP
 
 Standard library only: scrypt password hashing and an HMAC-signed, expiring session cookie.
 
-    python -m api.auth hash        # prints PHANTOM_ADMIN_PASSWORD_HASH for a password you type
+    python -m api.auth hash        # prints VESALIUS_ADMIN_PASSWORD_HASH for a password you type
 """
 
 from __future__ import annotations
@@ -30,16 +30,16 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
-COOKIE = "phantom_admin"
+COOKIE = "vesalius_admin"
 SESSION_SECONDS = 12 * 3600
 _SCRYPT = {"n": 2**15, "r": 8, "p": 1}
 _MAX_FAILS, _FAIL_WINDOW = 5, 600.0  # per client IP: 5 wrong passwords per 10 minutes
 AI_PER_IP, AI_WINDOW = 10, 3600.0      # per visitor: 10 AI explanations an hour
-AI_DAILY_CAP_DEFAULT = 300             # the whole site, per UTC day (PHANTOM_AI_DAILY_CAP)
+AI_DAILY_CAP_DEFAULT = 300             # the whole site, per UTC day (VESALIUS_AI_DAILY_CAP)
 
 
 def public_mode() -> bool:
-    return os.environ.get("PHANTOM_PUBLIC", "").strip().lower() in {"1", "true", "yes"}
+    return os.environ.get("VESALIUS_PUBLIC", "").strip().lower() in {"1", "true", "yes"}
 
 
 def hash_password(password: str, salt: bytes | None = None) -> str:
@@ -65,7 +65,7 @@ def verify_password(password: str, stored: str) -> bool:
 
 
 def _secret() -> bytes:
-    s = os.environ.get("PHANTOM_SESSION_SECRET", "")
+    s = os.environ.get("VESALIUS_SESSION_SECRET", "")
     if len(s) < 32:
         raise HTTPException(status_code=503, detail="Admin login is not configured on this server.")
     return s.encode()
@@ -101,7 +101,7 @@ def is_admin(request: Request) -> bool:
 
 
 def require_admin(request: Request) -> None:
-    """Dependency on every route that changes anything. A no-op unless PHANTOM_PUBLIC=1."""
+    """Dependency on every route that changes anything. A no-op unless VESALIUS_PUBLIC=1."""
     if not is_admin(request):
         raise HTTPException(status_code=401, detail="Sign in as the admin to do this.")
 
@@ -115,14 +115,15 @@ _today = lambda: time.strftime("%Y-%m-%d", time.gmtime())  # noqa: E731
 
 def ai_daily_cap() -> int:
     try:
-        return max(0, int(os.environ.get("PHANTOM_AI_DAILY_CAP", AI_DAILY_CAP_DEFAULT)))
+        return max(0, int(os.environ.get("VESALIUS_AI_DAILY_CAP", AI_DAILY_CAP_DEFAULT)))
     except ValueError:
         return AI_DAILY_CAP_DEFAULT
 
 
 def ai_limit(request: Request) -> None:
     """Dependency on the AI routes. A no-op locally and for the admin; on a public deployment each
-    visitor gets AI_PER_IP explanations per AI_WINDOW, and the site PHANTOM_AI_DAILY_CAP per day."""
+    visitor gets AI_PER_IP explanations per AI_WINDOW, and the site VESALIUS_AI_DAILY_CAP per
+    day."""
     if not public_mode() or is_admin(request):
         return
     ip = request.client.host if request.client else "?"
@@ -174,7 +175,7 @@ def login(body: Login, request: Request, response: Response) -> dict[str, bool]:
         raise HTTPException(
             status_code=429, detail="Too many attempts. Try again in a few minutes."
         )
-    stored = os.environ.get("PHANTOM_ADMIN_PASSWORD_HASH", "")
+    stored = os.environ.get("VESALIUS_ADMIN_PASSWORD_HASH", "")
     if not stored or not verify_password(body.password, stored):
         fails.append(now)
         raise HTTPException(status_code=401, detail="That password is not right.")

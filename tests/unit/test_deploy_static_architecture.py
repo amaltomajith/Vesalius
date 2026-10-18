@@ -45,12 +45,12 @@ def test_only_caddy_publishes_host_ports_in_production() -> None:
 
 def test_the_api_runs_in_public_mode_behind_https_presigning() -> None:
     env = _prod()["services"]["api"]["environment"]
-    assert env["PHANTOM_PUBLIC"] == "1"
+    assert env["VESALIUS_PUBLIC"] == "1"
     assert env["MINIO_PUBLIC_SECURE"] == "true"
-    assert env["MINIO_PUBLIC_ENDPOINT"] == "files.${PHANTOM_DOMAIN}"
+    assert env["MINIO_PUBLIC_ENDPOINT"] == "files.${VESALIUS_DOMAIN}"
     # both refuse to start empty rather than run an admin login with no password or secret
-    assert ":?" in env["PHANTOM_ADMIN_PASSWORD_HASH"]
-    assert ":?" in env["PHANTOM_SESSION_SECRET"]
+    assert ":?" in env["VESALIUS_ADMIN_PASSWORD_HASH"]
+    assert ":?" in env["VESALIUS_SESSION_SECRET"]
 
 
 def test_the_api_trusts_forwarded_headers_so_the_login_rate_limit_is_per_visitor() -> None:
@@ -60,7 +60,7 @@ def test_the_api_trusts_forwarded_headers_so_the_login_rate_limit_is_per_visitor
 
 def test_the_files_host_serves_only_reads_of_the_gold_bucket() -> None:
     caddy = _caddyfile()
-    block = caddy[caddy.index("files.{$PHANTOM_DOMAIN} {") :]
+    block = caddy[caddy.index("files.{$VESALIUS_DOMAIN} {") :]
     assert re.search(r"method GET HEAD OPTIONS\s+path /gold/\*", block)
     assert "handle @gold" in block and "reverse_proxy minio:9000" in block
     assert re.search(r"handle \{\s+respond \"Not found\" 404", block)

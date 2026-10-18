@@ -1,4 +1,4 @@
-# ---- the Phantom app (viewer/, React/Vite): built here, served by FastAPI at /app/ ----------------
+# ---- the Vesalius app (viewer/, React/Vite): built here, served by FastAPI at /app/ ----------------
 # The prebuild step vendors MediaPipe (WASM from node_modules, hand model hash-pinned) so the served
 # viewer makes no CDN request at runtime. The demo study (viewer/public/demo) is included when it
 # was bundled locally (scripts/bundle_viewer_demo.py); it is never in git.

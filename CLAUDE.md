@@ -1,4 +1,4 @@
-# CLAUDE.md — Phantom (pipeline + viewer)
+# CLAUDE.md — Vesalius (pipeline + viewer)
 
 Project context for AI coding agents. Read this first, every session.
 
@@ -27,7 +27,11 @@ each other or are silent, ask rather than guess.
 
 ## What this is
 
-**Phantom** turns identifiable patient scans into 3D data that is safe to use, and proves it.
+**Vesalius** turns identifiable patient scans into 3D data that is safe to use, and proves it.
+
+_Named Phantom until 2026-10-19 (env vars were `PHANTOM_*`, now `VESALIUS_*`). Lowercase
+"phantom" in the code is the imaging sense, a synthetic test object (`tests/fixtures/head_phantom.py`,
+`pipeline.demo.phantoms`), and stays; so does the `phantom_viewer_nm` Docker volume name._
 
 Two systems, one platform:
 
@@ -228,7 +232,7 @@ Viewer facts worth knowing before touching it:
 **Deployment (built, not yet provisioned):** `DEPLOY.md`, all on free services (research
 2026-10-18): one Oracle Cloud Always Free Ampere A1 VM, which is **2 OCPU / 12 GB since 15 June
 2026** (half the old allowance), so one segmentation at a time; DuckDNS + Caddy for HTTPS; the arm64
-api image built on GitHub's free arm64 runners into ghcr.io; UptimeRobot. `PHANTOM_PUBLIC=1` makes
+api image built on GitHub's free arm64 runners into ghcr.io; UptimeRobot. `VESALIUS_PUBLIC=1` makes
 every mutating route admin-only (`src/api/auth.py`, scrypt hash + signed cookie; a unit test fails
 if a new mutating route lacks `require_admin`). The deliberate exception is the AI explanations,
 open to visitors but rate-limited per IP and per day. `docker-compose.prod.yml` + `deploy/Caddyfile`:

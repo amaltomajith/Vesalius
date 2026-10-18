@@ -12,7 +12,7 @@ import { useStudyStore } from '../store/studyStore';
 import { aiStatus } from '../services/ai';
 import { decideSnapshot } from '../lib/snapshot';
 
-const HANDS_KEY = 'phantom.hands';
+const HANDS_KEY = 'vesalius.hands';
 
 function readHandsPref(): boolean {
   try { return localStorage.getItem(HANDS_KEY) !== 'off'; } catch { return true; }

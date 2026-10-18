@@ -1,4 +1,4 @@
-Phantom full-body atlas: credits and licence
+Vesalius full-body atlas: credits and licence
 
 The 3D anatomy is the Z-Anatomy atlas, as bundled with the Holoscan viewer:
   "BodyParts3D - The Database Center for Life Science - CC-BY-SA 2.1 Japan"

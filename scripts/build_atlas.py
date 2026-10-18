@@ -1,4 +1,4 @@
-"""Builds the full-body atlas the Phantom app shows at /app/body (Holoscan's 8 systems, full
+"""Builds the full-body atlas the Vesalius app shows at /app/body (Holoscan's 8 systems, full
 detail) into assets/atlas/, so this project runs without the Holoscan folder.
 
     python scripts/build_atlas.py [HOLOSCAN_DIR]        # default F:/Projects/Holoscan
@@ -445,7 +445,7 @@ def main() -> int:
 
 
 CREDITS = """\
-Phantom full-body atlas: credits and licence
+Vesalius full-body atlas: credits and licence
 
 The 3D anatomy is the Z-Anatomy atlas, as bundled with the Holoscan viewer:
   "BodyParts3D - The Database Center for Life Science - CC-BY-SA 2.1 Japan"

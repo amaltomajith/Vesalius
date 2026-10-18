@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Nightly backup on the server: a Postgres dump plus a copy of the silver and gold buckets, kept
-# for 7 days under $BACKUP_DIR (default /var/backups/phantom). Bronze is deliberately NOT copied:
+# for 7 days under $BACKUP_DIR (default /var/backups/vesalius). Bronze is deliberately NOT copied:
 # it holds the PHI-bearing originals, and every scan here is public and can be fetched again.
 #
-#   crontab -e   ->   30 3 * * *  bash /home/ubuntu/phantom/scripts/deploy/backup.sh
+#   crontab -e   ->   30 3 * * *  bash /home/ubuntu/vesalius/scripts/deploy/backup.sh
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 COMPOSE=(docker compose -f docker-compose.yml -f docker-compose.prod.yml)
-BACKUP_DIR="${BACKUP_DIR:-/var/backups/phantom}"
+BACKUP_DIR="${BACKUP_DIR:-/var/backups/vesalius}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 OUT="$BACKUP_DIR/$STAMP"
 mkdir -p "$OUT"

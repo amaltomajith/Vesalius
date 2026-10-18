@@ -1,9 +1,9 @@
-# Phantom — Build Kickoff
+# Vesalius — Build Kickoff
 
 ## Setup
 
 ```bash
-mkdir phantom && cd phantom
+mkdir vesalius && cd vesalius
 git init
 
 cp /path/to/CLAUDE.md .
@@ -18,7 +18,7 @@ git subtree add --prefix=viewer <holoscan-repo-url> main --squash
 Repo shape:
 
 ```
-phantom/
+vesalius/
   CLAUDE.md
   refs/
   pipeline/        <- new, Python

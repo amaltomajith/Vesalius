@@ -1,6 +1,6 @@
 
 /* ── ROOM TOKENS ────────────────────────────────────────────────
-   Holoscan's HUD, re-toned for Phantom's scan room (surgical green, user decision 2026-09-27).
+   Holoscan's HUD, re-toned for Vesalius's scan room (surgical green, user decision 2026-09-27).
    The HUD's own token names are kept so its rules below stay as they were; they now resolve to
    the room palette in styles/tokens.css. Scoped to .room: the dashboard screens stay light. */
 .room {
@@ -759,7 +759,7 @@
   line-height: 1;
 }
 
-/* ── PHANTOM: pipeline-fed additions (monochrome + gold; group colours stay in the layers) ── */
+/* ── VESALIUS: pipeline-fed additions (monochrome + gold; group colours stay in the layers) ── */
 .layer-btn__swatch {
   width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0;
   background: var(--sys-color, var(--text-lo));

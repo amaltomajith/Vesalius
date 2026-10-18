@@ -1,4 +1,4 @@
-# Deploying Phantom (free)
+# Deploying Vesalius (free)
 
 A public showcase plus one admin login that unlocks uploads, pipeline runs and proofs. Everything
 below is free (checked October 2026):
@@ -13,12 +13,12 @@ internet ──443──> Caddy ──> api:8000        https://<name>.duckdns.o
                         └─> minio:9000      https://files.<name>.duckdns.org  GET/HEAD /gold/* only
                  (postgres, minio, api: no host ports)
 
-GitHub (public repo) ── CI on ubuntu-24.04-arm ──> ghcr.io/<you>/phantom-api ──pull──> the VM
+GitHub (public repo) ── CI on ubuntu-24.04-arm ──> ghcr.io/<you>/vesalius-api ──pull──> the VM
 ```
 
 Locally nothing changes: `Start Demo.bat` still runs everything on `127.0.0.1` with no login.
 
-**Why this stack:** the research behind it is in the session's report "Free hosting for Phantom".
+**Why this stack:** research into free hosting, October 2026 (the report "Free hosting for Phantom", written before the product was renamed Vesalius).
 Oracle's A1 is the only always-free machine that can run a segmentation:
 - Free container platforms stop at 1 GB of RAM.
 - Hugging Face Docker Spaces now need a paid plan.
@@ -26,13 +26,13 @@ Oracle's A1 is the only always-free machine that can run a segmentation:
 
 ## What public mode does
 
-`PHANTOM_PUBLIC=1` (set by `docker-compose.prod.yml`):
+`VESALIUS_PUBLIC=1` (set by `docker-compose.prod.yml`):
 
 - **Visitors can look:** landing, app, studies, hologram, full-body atlas, lineage, reports, proof
   verdicts, API docs, gold downloads.
 - **Visitors can ask the AI**, within limits:
   - 10 explanations an hour per visitor
-  - 300 a day for the whole site (`PHANTOM_AI_DAILY_CAP`), so the free Groq quota can't be drained
+  - 300 a day for the whole site (`VESALIUS_AI_DAILY_CAP`), so the free Groq quota can't be drained
   - Snapshots are sent only for the atlas, never for a patient study (CLAUDE.md hard rule 8).
 - **Only the admin can act:** `POST /demo/runs/*`, `POST /demo/proofs/*` and `/ingest` return 401
   to everyone else.
@@ -50,9 +50,9 @@ Oracle's A1 is the only always-free machine that can run a segmentation:
 
 1. **GitHub.** Create a **public** repository and push this branch to it as `main`. CI
    (`.github/workflows/ci.yml`) then builds the arm64 api image and publishes it as
-   `ghcr.io/<you>/phantom-api`.
+   `ghcr.io/<you>/vesalius-api`.
    - After the first green run, open the package on GitHub (your profile → Packages →
-     `phantom-api` → Package settings) and set its visibility to **Public**. ghcr.io packages
+     `vesalius-api` → Package settings) and set its visibility to **Public**. ghcr.io packages
      start private even for public repositories, and the server pulls without a login.
 2. **Oracle Cloud.** Sign up at <https://signup.cloud.oracle.com>.
    - A phone number and a card are needed for identity; Always Free resources are not charged.
@@ -60,7 +60,7 @@ Oracle's A1 is the only always-free machine that can run a segmentation:
      compute lives there.
    - Stay on the free account (the decision for this deployment): no Pay As You Go upgrade, so
      the card can never be billed.
-3. **DuckDNS.** Log in at <https://www.duckdns.org>, create a subdomain (e.g. `phantom-yourname`),
+3. **DuckDNS.** Log in at <https://www.duckdns.org>, create a subdomain (e.g. `vesalius-yourname`),
    and copy the **token**.
 4. **Groq (optional).** A free API key from <https://console.groq.com> for the AI explanations.
    You put it in `.env` on the server yourself (step 4).
@@ -83,9 +83,9 @@ Oracle's A1 is the only always-free machine that can run a segmentation:
 
 ```bash
 ssh ubuntu@<vm-ip>
-git clone https://github.com/<you>/<repo>.git ~/phantom      # public: no key needed
-cd ~/phantom
-sudo bash scripts/deploy/setup-server.sh phantom-yourname.duckdns.org <duckdns-token>
+git clone https://github.com/<you>/<repo>.git ~/vesalius      # public: no key needed
+cd ~/vesalius
+sudo bash scripts/deploy/setup-server.sh vesalius-yourname.duckdns.org <duckdns-token>
 exit   # log in again so the docker group applies
 ```
 
@@ -98,15 +98,15 @@ exit   # log in again so the docker group applies
 - writes `.env`:
   - random database, MinIO and de-identification secrets
   - the domain and a session secret
-  - `PHANTOM_IMAGE`, read from the git remote
+  - `VESALIUS_IMAGE`, read from the git remote
 
 ## 4 · Deploy
 
-Optional, the AI: `nano ~/phantom/.env` and set `GROQ_API_KEY=` to your key. You type it; nothing
+Optional, the AI: `nano ~/vesalius/.env` and set `GROQ_API_KEY=` to your key. You type it; nothing
 else ever writes it.
 
 ```bash
-cd ~/phantom
+cd ~/vesalius
 bash scripts/deploy/deploy.sh --studies
 ```
 
@@ -129,7 +129,7 @@ pulls the code and the new image and restarts.
 From your own machine:
 
 ```bash
-D=phantom-yourname.duckdns.org
+D=vesalius-yourname.duckdns.org
 curl -sI https://$D/ | head -1                               # 200
 curl -s  https://$D/auth/me                                  # {"public":true,"admin":false}
 curl -s -o /dev/null -w '%{http_code}\n' -X POST https://$D/demo/proofs/face   # 401

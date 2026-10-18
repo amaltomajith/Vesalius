@@ -9,7 +9,7 @@ from pipeline.common.logging import configure_logging
 
 def create_app() -> FastAPI:
     configure_logging()
-    app = FastAPI(title="Phantom API")
+    app = FastAPI(title="Vesalius API")
     app.include_router(health.router)
     app.include_router(ingest.router)
     app.include_router(catalog.router)

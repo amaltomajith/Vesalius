@@ -36,7 +36,7 @@ function usePipelineStatus(): Status {
   return status;
 }
 
-/** Phantom's frame: a dark top bar over every screen except the immersive hologram. */
+/** Vesalius's frame: a dark top bar over every screen except the immersive hologram. */
 export default function Shell({ children }: { children?: ReactNode }) {
   const [message, setMessage] = useState<string | null>(null);
   const timer = useRef<number | undefined>(undefined);
@@ -54,11 +54,11 @@ export default function Shell({ children }: { children?: ReactNode }) {
     <ToastContext.Provider value={{ toast }}>
       <div className="shell">
         <header className="topbar">
-          <a className="brand" href="/" title="About Phantom">
+          <a className="brand" href="/" title="About Vesalius">
             <span className="brand-mark" aria-hidden="true" />
-            <span>Phantom</span>
+            <span>Vesalius</span>
           </a>
-          <nav className="topnav" aria-label="Phantom">
+          <nav className="topnav" aria-label="Vesalius">
             {NAV.map(({ to, label, icon: Icon, end }) => (
               <NavLink key={to} to={to} end={end} className={({ isActive }) => `topnav__item${isActive ? ' topnav__item--on' : ''}`}>
                 <Icon size={16} />

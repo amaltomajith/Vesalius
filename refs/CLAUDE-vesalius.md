@@ -1,4 +1,4 @@
-# CLAUDE.md — Phantom
+# CLAUDE.md — Vesalius
 
 Project context for AI coding agents. Read this first, every session.
 
@@ -27,7 +27,7 @@ each other or are silent, ask rather than guess.
 
 ## What this is
 
-**Phantom** turns identifiable patient scans into 3D data that is safe to use, and proves it.
+**Vesalius** turns identifiable patient scans into 3D data that is safe to use, and proves it.
 
 Two systems, one platform:
 

@@ -6,7 +6,7 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   try {
     response = await fetch(path, options);
   } catch {
-    throw new Error('Cannot reach the Phantom server. Is it still running?');
+    throw new Error('Cannot reach the Vesalius server. Is it still running?');
   }
   let body: unknown = null;
   try { body = await response.json(); } catch { /* not JSON */ }

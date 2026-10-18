@@ -49,7 +49,7 @@ const STATUS: Record<GestureState['activeGesture'], { label: string; icon: React
   NONE: { label: 'Ready', icon: <Hand size={13} /> },
 };
 
-const GUIDE_SEEN = 'phantom.handGuideSeen';
+const GUIDE_SEEN = 'vesalius.handGuideSeen';
 const guideSeen = () => { try { return localStorage.getItem(GUIDE_SEEN) === '1'; } catch { return true; } };
 
 export default function HUDOverlay({
@@ -113,11 +113,11 @@ export default function HUDOverlay({
     <div className="hud-container">
       <header className="hud-top-bar">
         <div className="hud-logo">
-          <Link to={backTo} className="hud-back hud-interactive" aria-label="Back to Phantom">
+          <Link to={backTo} className="hud-back hud-interactive" aria-label="Back to Vesalius">
             <ArrowLeft size={15} />
           </Link>
           <Stack size={19} weight="fill" className="hud-brand-mark" aria-hidden="true" />
-          <span className="logo-text">Phantom</span>
+          <span className="logo-text">Vesalius</span>
           <span className="hud-scene-title" data-testid="scene-title">{title}</span>
         </div>
 

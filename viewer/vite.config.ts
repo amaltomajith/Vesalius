@@ -1,9 +1,9 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// Phantom's app. Served by the pipeline's FastAPI app at /app (same origin as its API, no CORS).
+// Vesalius's app. Served by the pipeline's FastAPI app at /app (same origin as its API, no CORS).
 // In development the API calls and the atlas files are proxied to the running demo instead.
-const API = process.env.PHANTOM_API ?? 'http://localhost:8001'
+const API = process.env.VESALIUS_API ?? 'http://localhost:8001'
 
 export default defineConfig({
   base: '/app/',

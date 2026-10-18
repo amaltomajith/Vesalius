@@ -189,7 +189,7 @@ function dissolving(material, { invert = false, veins = false, scan = false } = 
         totalEmissiveRadiance += uSeam * eDis * 2.4 + uGlowColor * uGlow * 0.55;
         ${scan ? "totalEmissiveRadiance += uSeam * (lScan * 1.5 + eScan * 2.6) + vec3(1.0, 0.45, 0.36) * sear * 4.0;" : ""}`);
   };
-  material.customProgramCacheKey = () => `phantom-dissolve-${invert ? 1 : 0}-${veins ? 1 : 0}-${scan ? 1 : 0}`;
+  material.customProgramCacheKey = () => `vesalius-dissolve-${invert ? 1 : 0}-${veins ? 1 : 0}-${scan ? 1 : 0}`;
   return u;
 }
 

@@ -56,7 +56,7 @@ def test_the_pages_and_their_assets_are_served(client: TestClient) -> None:
     landing = client.get("/")
     assert landing.status_code == 200 and 'href="/app/"' in landing.text
     assert landing.text.count("<canvas") == 1 and 'id="hall-canvas"' in landing.text
-    # the console became the Phantom app: its old address redirects there
+    # the console became the Vesalius app: its old address redirects there
     console = client.get("/console", follow_redirects=False)
     assert console.status_code == 308 and console.headers["location"] == "/app/pipeline"
     for asset in (

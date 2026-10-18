@@ -46,9 +46,9 @@ def _mutating_routes() -> list[APIRoute]:
 
 @pytest.fixture
 def public(monkeypatch: pytest.MonkeyPatch) -> str:
-    monkeypatch.setenv("PHANTOM_PUBLIC", "1")
-    monkeypatch.setenv("PHANTOM_SESSION_SECRET", "s" * 48)
-    monkeypatch.setenv("PHANTOM_ADMIN_PASSWORD_HASH", auth.hash_password("correct horse battery"))
+    monkeypatch.setenv("VESALIUS_PUBLIC", "1")
+    monkeypatch.setenv("VESALIUS_SESSION_SECRET", "s" * 48)
+    monkeypatch.setenv("VESALIUS_ADMIN_PASSWORD_HASH", auth.hash_password("correct horse battery"))
     auth._fails.clear()
     return "correct horse battery"
 
@@ -82,7 +82,7 @@ def test_a_visitor_is_refused_on_every_mutating_route(public: str) -> None:
 
 
 def test_locally_nothing_changes(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("PHANTOM_PUBLIC", raising=False)
+    monkeypatch.delenv("VESALIUS_PUBLIC", raising=False)
     client = TestClient(api_main.create_app())
     assert client.get("/auth/me").json() == {"public": False, "admin": True}
     # reaches the route itself (400: unknown sample), not the admin check
@@ -132,9 +132,9 @@ def test_passwords_are_stored_as_scrypt_hashes() -> None:
 
 
 def test_download_links_are_signed_for_the_public_https_host() -> None:
-    s = Settings(minio_public_endpoint="files.phantom.example", minio_public_secure=True)
+    s = Settings(minio_public_endpoint="files.vesalius.example", minio_public_secure=True)
     url = gold_presign_client(s).presigned_get_object("gold", "a/b.glb")
-    assert url.startswith("https://files.phantom.example/gold/a/b.glb?")
+    assert url.startswith("https://files.vesalius.example/gold/a/b.glb?")
 
 
 # ---- the AI: open to visitors, limited -------------------------------------------------------
@@ -170,7 +170,7 @@ def test_a_visitor_may_ask_the_ai_ten_times_an_hour(ai_open: dict[str, float]) -
 def test_the_site_stops_at_its_daily_ai_cap(
     ai_open: dict[str, float], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("PHANTOM_AI_DAILY_CAP", "3")
+    monkeypatch.setenv("VESALIUS_AI_DAILY_CAP", "3")
     clients = [TestClient(api_main.create_app(), client=(f"10.0.0.{i}", 50000)) for i in range(5)]
     codes = [_explain(c) for c in clients]
     assert codes == [200, 200, 200, 429, 429]       # five visitors, three answers, then the cap
@@ -187,7 +187,7 @@ def test_the_admin_is_not_limited(ai_open: dict[str, float]) -> None:
 def test_locally_the_ai_has_no_limit(monkeypatch: pytest.MonkeyPatch) -> None:
     from api.routers import ai
 
-    monkeypatch.delenv("PHANTOM_PUBLIC", raising=False)
+    monkeypatch.delenv("VESALIUS_PUBLIC", raising=False)
     monkeypatch.setenv("GROQ_API_KEY", "test-key")
     monkeypatch.setattr(ai, "open_stream", lambda key, payload: iter(["ok"]))
     monkeypatch.setattr(ai, "_atlas_nodes", lambda: frozenset({"Femur"}))

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploy (or redeploy) the public Phantom showcase on the server. Run from the repository:
+# Deploy (or redeploy) the public Vesalius showcase on the server. Run from the repository:
 #
 #   bash scripts/deploy/deploy.sh            # pull the code and the CI-built image, restart, wait until healthy
 #   bash scripts/deploy/deploy.sh --studies  # ... then load the three public demo studies
@@ -12,20 +12,20 @@ COMPOSE=(docker compose -f docker-compose.yml -f docker-compose.prod.yml)
 env_value() { sed -n "s/^$1=//p" .env | head -n1; }
 
 [ -f .env ] || { echo "No .env: run scripts/deploy/setup-server.sh first." >&2; exit 1; }
-DOMAIN="$(env_value PHANTOM_DOMAIN)"
-[ -n "$DOMAIN" ] || { echo "PHANTOM_DOMAIN is not set in .env." >&2; exit 1; }
+DOMAIN="$(env_value VESALIUS_DOMAIN)"
+[ -n "$DOMAIN" ] || { echo "VESALIUS_DOMAIN is not set in .env." >&2; exit 1; }
 
 echo "== pull"
 git pull --ff-only
 
-[ -n "$(env_value PHANTOM_IMAGE)" ] || { echo "PHANTOM_IMAGE is not set in .env." >&2; exit 1; }
-IMAGE="$(env_value PHANTOM_IMAGE):$(env_value PHANTOM_TAG)"; IMAGE="${IMAGE%:}"
+[ -n "$(env_value VESALIUS_IMAGE)" ] || { echo "VESALIUS_IMAGE is not set in .env." >&2; exit 1; }
+IMAGE="$(env_value VESALIUS_IMAGE):$(env_value VESALIUS_TAG)"; IMAGE="${IMAGE%:}"
 case " $* " in
   *" --build "*) echo "== build (here, on the server)"; docker build -t "$IMAGE" -f docker/api/Dockerfile . ;;
   *) echo "== pull $IMAGE"; docker pull "$IMAGE" ;;
 esac
 
-if [ -z "$(env_value PHANTOM_ADMIN_PASSWORD_HASH)" ]; then
+if [ -z "$(env_value VESALIUS_ADMIN_PASSWORD_HASH)" ]; then
   echo "== admin password (12+ characters; only its hash is stored)"
   # The base file only: the prod overlay refuses to start without the hash we are making. The
   # prompts go to the terminal; the hash goes to a file (never echoed, never in shell history).
@@ -35,8 +35,8 @@ if [ -z "$(env_value PHANTOM_ADMIN_PASSWORD_HASH)" ]; then
   docker run --rm -it -v "$TMP:/out" --entrypoint sh "$IMAGE" -c 'python -m api.auth hash > /out/hash'
   HASH="$(tr -d '\r\n' < "$TMP/hash")"
   case "$HASH" in scrypt:*) ;; *) echo "Could not create the password hash." >&2; exit 1 ;; esac
-  sed -i '/^PHANTOM_ADMIN_PASSWORD_HASH=/d' .env
-  printf 'PHANTOM_ADMIN_PASSWORD_HASH=%s\n' "$HASH" >> .env
+  sed -i '/^VESALIUS_ADMIN_PASSWORD_HASH=/d' .env
+  printf 'VESALIUS_ADMIN_PASSWORD_HASH=%s\n' "$HASH" >> .env
 fi
 
 echo "== start"

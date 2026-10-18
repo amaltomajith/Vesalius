@@ -1,4 +1,4 @@
-"""The Phantom app (viewer/, React) as served by the API, and the guarantees its source must keep.
+"""The Vesalius app (viewer/, React) as served by the API, and the guarantees its source must keep.
 
 * the built app is served at /app/ on the API's own origin (no CORS, no second server), with
   client-side routes falling back to index.html and the atlas at /app/atlas/;
@@ -29,7 +29,7 @@ VIEWER_SRC = ROOT / "viewer" / "src"
 def built_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     app = tmp_path / "app"
     (app / "assets").mkdir(parents=True)
-    (app / "index.html").write_text("<!doctype html><title>Phantom</title>", "utf-8")
+    (app / "index.html").write_text("<!doctype html><title>Vesalius</title>", "utf-8")
     (app / "assets" / "index-abc123.js").write_text("console.log(1)", "utf-8")
     (app / "favicon.svg").write_text("<svg/>", "utf-8")
     atlas = tmp_path / "atlas"
@@ -37,8 +37,8 @@ def built_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     (atlas / "atlas.json").write_text("{}", "utf-8")
     (atlas / "skeletal.glb").write_bytes(b"glTF")
     (tmp_path / "secret.txt").write_text("outside", "utf-8")
-    monkeypatch.setenv("PHANTOM_APP_DIR", str(app))
-    monkeypatch.setenv("PHANTOM_ATLAS_DIR", str(atlas))
+    monkeypatch.setenv("VESALIUS_APP_DIR", str(app))
+    monkeypatch.setenv("VESALIUS_ATLAS_DIR", str(atlas))
     return tmp_path
 
 
@@ -48,7 +48,7 @@ def test_the_app_is_served_at_app_with_client_routes(built_app: Path) -> None:
     assert root.status_code == 308 and root.headers["location"] == "/app/"
     for route in ("/app/", "/app/studies", "/app/hologram/abc", "/app/body", "/app/pipeline"):
         page = client.get(route)
-        assert page.status_code == 200 and "<title>Phantom</title>" in page.text, route
+        assert page.status_code == 200 and "<title>Vesalius</title>" in page.text, route
         assert page.headers["cache-control"] == "no-cache", route
     asset = client.get("/app/assets/index-abc123.js")
     assert asset.status_code == 200 and "immutable" in asset.headers["cache-control"]
@@ -91,7 +91,7 @@ def test_the_old_addresses_redirect_into_the_app(built_app: Path) -> None:
 
 
 def test_an_unbuilt_app_is_a_clean_404(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("PHANTOM_APP_DIR", str(tmp_path))  # empty: no index.html
+    monkeypatch.setenv("VESALIUS_APP_DIR", str(tmp_path))  # empty: no index.html
     monkeypatch.setattr(ui, "app_dir", lambda: None)
     assert TestClient(api_main.create_app()).get("/app/").status_code == 404
 

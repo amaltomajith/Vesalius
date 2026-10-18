@@ -1,4 +1,4 @@
-# Phantom: full project context
+# Vesalius: full project context
 
 This is a self-contained briefing for anyone, human or AI, who has **not** seen the repository or
 the conversations that built it. It covers what the project is, why it exists, how every part
@@ -10,7 +10,7 @@ works, the decisions made and their reasons, the current state, and what remains
 
 ## 1. TL;DR
 
-- **Phantom** is a governed data pipeline that turns CT and MR scans (DICOM) into 3D data that is
+- **Vesalius** is a governed data pipeline that turns CT and MR scans (DICOM) into 3D data that is
   safe to share, and **proves** it with automated tests.
 - **Thesis:** *de-identifying the metadata of a medical image is not the same as de-identifying
   its output.* A 3D surface mesh built from a head CT is a recognisable face, so the pipeline
@@ -391,7 +391,7 @@ domain; a private GitHub repo.
 | CI | **GitHub Actions** (`.github/workflows/ci.yml`) |
 | Uptime | UptimeRobot on `/health` |
 
-**Public mode** (`PHANTOM_PUBLIC=1`, in `src/api/auth.py`):
+**Public mode** (`VESALIUS_PUBLIC=1`, in `src/api/auth.py`):
 - **Visitors can look at everything:** landing, app, studies, atlas, lineage, reports, proof
   verdicts, API docs and gold downloads.
 - **Admin-only routes:**
@@ -404,12 +404,12 @@ domain; a private GitHub repo.
 - **The admin login:**
   - one password, stored as a **scrypt hash** `scrypt:<salt>:<dk>` in `.env`. The separator is
     `:` because Compose interpolates `$` in `.env`, which would corrupt the hash;
-  - an HMAC-signed session cookie `phantom_admin`: HttpOnly, Secure, SameSite=Strict, 12 h;
+  - an HMAC-signed session cookie `vesalius_admin`: HttpOnly, Secure, SameSite=Strict, 12 h;
   - 5 failed logins per IP per 10 minutes, then 429.
 - **Creating the hash:** `python -m api.auth hash`.
 - **The study loader in public mode:** `scripts/load_demo_studies.py` signs its own admin session
-  from `PHANTOM_SESSION_SECRET`.
-- **Without `PHANTOM_PUBLIC`,** everything behaves exactly as in the local demo.
+  from `VESALIUS_SESSION_SECRET`.
+- **Without `VESALIUS_PUBLIC`,** everything behaves exactly as in the local demo.
 
 **`docker-compose.prod.yml`** (an overlay; needs Compose v2.24+ for `!reset`):
 - Caddy is the **only** service with host ports (80/443); postgres, minio and the api have none.
@@ -565,4 +565,4 @@ torch 2.14 CPU. S8 and S10 timings on A1 cores are **unmeasured** until the firs
 - **Manifest:** the gold JSON beside each export: frame, parameters, provenance, deface status.
 - **Presigned URL:** a time-limited signed link straight to an object in MinIO (gold only).
 - **Medallion (bronze/silver/gold):** raw → cleaned and validated → served products.
-- **Holoscan:** the original gesture-controlled 3D viewer project, now merged into Phantom's app.
+- **Holoscan:** the original gesture-controlled 3D viewer project, now merged into Vesalius's app.

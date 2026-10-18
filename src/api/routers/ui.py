@@ -2,7 +2,7 @@
 script, style, fonts, icons and 3D-viewer library, all from `src/api/static/` (no build step, no
 external requests, works offline).
 
-Also serves the Phantom app (`viewer/`, built by Vite) at `/app/`: the dashboard, the pipeline
+Also serves the Vesalius app (`viewer/`, built by Vite) at `/app/`: the dashboard, the pipeline
 runner, the study library, the proofs and the hands-controlled hologram, same origin as the API it
 consumes (no CORS). `/app/atlas/` serves the full-body atlas (`assets/atlas/`). The old console
 (`/console`) and viewer (`/viewer/`) addresses redirect into it."""
@@ -26,11 +26,11 @@ NO_CACHE = {"Cache-Control": "no-cache"}
 
 
 def app_dir() -> Path | None:
-    """The built Phantom app (viewer/ built by Vite), if there is one: $PHANTOM_APP_DIR, the
+    """The built Vesalius app (viewer/ built by Vite), if there is one: $VESALIUS_APP_DIR, the
     image's copy, or a local build. None when it was never built (the API still runs; /app/ is
     then 404)."""
     candidates = [
-        os.environ.get("PHANTOM_APP_DIR"),
+        os.environ.get("VESALIUS_APP_DIR"),
         "/app/app_dist",
         str(Path(__file__).resolve().parents[3] / "viewer" / "dist"),
     ]
@@ -43,7 +43,7 @@ def app_dir() -> Path | None:
 def atlas_dir() -> Path | None:
     """The full-body atlas (assets/atlas/, built by scripts/build_atlas.py)."""
     candidates = [
-        os.environ.get("PHANTOM_ATLAS_DIR"),
+        os.environ.get("VESALIUS_ATLAS_DIR"),
         "/app/assets/atlas",
         str(Path(__file__).resolve().parents[3] / "assets" / "atlas"),
     ]
@@ -84,7 +84,7 @@ def landing() -> FileResponse:
     return FileResponse(STATIC_DIR / "landing.html", media_type="text/html", headers=NO_CACHE)
 
 
-# ---- the Phantom app (/app) and the addresses it replaced ---------------------------------------
+# ---- the Vesalius app (/app) and the addresses it replaced ---------------------------------------
 
 
 @router.get("/app", include_in_schema=False)
@@ -103,7 +103,7 @@ def app_files(path: str, request: Request) -> Response:
         return FileResponse(found, headers=headers)
     base = app_dir()
     if base is None:
-        raise HTTPException(status_code=404, detail="the Phantom app has not been built")
+        raise HTTPException(status_code=404, detail="the Vesalius app has not been built")
     found = _inside(base, path) if path else None
     if found is not None:
         return FileResponse(found, headers=IMMUTABLE if path.startswith("assets/") else NO_CACHE)

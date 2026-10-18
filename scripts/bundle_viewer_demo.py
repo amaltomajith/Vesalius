@@ -23,7 +23,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "viewer" / "public" / "demo" / "chest"
 CREDIT = """\
-Bundled demo study for the Phantom viewer.
+Bundled demo study for the Vesalius viewer.
 
 Source: The Cancer Imaging Archive (TCIA), LIDC-IDRI collection, patient LIDC-IDRI-0001,
 one chest CT series. Licence: CC BY 3.0. DOI: 10.7937/K9/TCIA.2015.LO9QL9SX

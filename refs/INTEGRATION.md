@@ -1,4 +1,4 @@
-# Integration — Phantom → Holoscan
+# Integration — Vesalius → Holoscan
 
 How the pipeline feeds the viewer. **Read this before changing either system.**
 
@@ -6,7 +6,7 @@ How the pipeline feeds the viewer. **Read this before changing either system.**
 
 ## 1. What changes and why
 
-Holoscan currently loads eight static GLB files of a generic body. Phantom produces GLB from
+Holoscan currently loads eight static GLB files of a generic body. Vesalius produces GLB from
 real patient scans. Connecting them turns an anatomy atlas into a patient-specific viewer.
 
 Two roadmap items on the viewer close as a side effect: simulated vitals become real study
@@ -16,7 +16,7 @@ because structure names arrive from segmentation.
 ### The blocker
 
 Holoscan's entire interaction model depends on `mesh.name` — raycast hits a mesh, look up the
-name, populate the panel. Phantom's current output is a **threshold-derived surface**: mesh the
+name, populate the panel. Vesalius's current output is a **threshold-derived surface**: mesh the
 bone preset and you get one undifferentiated skeleton with arbitrary component names. Point at
 it and there is nothing to name.
 

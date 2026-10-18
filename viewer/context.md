@@ -1,4 +1,4 @@
-> **Phantom note (phase two).** This file documents Holoscan as it was before it became the
+> **Vesalius note (phase two).** This file documents Holoscan as it was before it became the
 > pipeline's viewer. Changed since: groups come from each study's `structures.json` (validated
 > against mesh_contract, fail closed); the fixed atlas GLBs, the simulated vitals and the Groq
 > vision call are gone (the panel is MEASUREMENTS & CONTEXT, computed from pipeline

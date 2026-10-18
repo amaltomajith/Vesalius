@@ -1,4 +1,4 @@
-# Phantom CI: every push and pull request.
+# Vesalius CI: every push and pull request.
 #   python       ruff, mypy, the unit tests (no Postgres/MinIO/tesseract needed)
 #   viewer       tsc + vitest + the production build of the app
 #   integration  the integration, OCR and proof tests, in the real api image against real
@@ -106,12 +106,12 @@ jobs:
           file: docker/api/Dockerfile
           platforms: linux/arm64
           load: true
-          tags: phantom-api:ci
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/phantom-api:buildcache
-          cache-to: ${{ github.ref == 'refs/heads/main' && format('type=registry,ref=ghcr.io/{0}/phantom-api:buildcache,mode=max', github.repository_owner) || '' }}
+          tags: vesalius-api:ci
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/vesalius-api:buildcache
+          cache-to: ${{ github.ref == 'refs/heads/main' && format('type=registry,ref=ghcr.io/{0}/vesalius-api:buildcache,mode=max', github.repository_owner) || '' }}
       - name: Smoke test (every heavy dependency imports on arm64; the unit tests pass in the image)
         run: |
-          docker run --rm --entrypoint sh phantom-api:ci -c "
+          docker run --rm --entrypoint sh vesalius-api:ci -c "
             python -c 'import torch, torchvision, totalsegmentator, SimpleITK, fast_simplification, pydicom, pytesseract, trimesh, skimage; print(\"torch\", torch.__version__, torch.backends.cpu.get_cpu_capability())' &&
             tesseract --version | head -1 &&
             python -m pytest -q -m 'not integration and not ocr' tests/unit"
@@ -120,7 +120,7 @@ jobs:
         run: |
           OWNER="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
           for tag in latest "${GITHUB_SHA::12}"; do
-            docker tag phantom-api:ci "ghcr.io/$OWNER/phantom-api:$tag"
-            docker push "ghcr.io/$OWNER/phantom-api:$tag"
+            docker tag vesalius-api:ci "ghcr.io/$OWNER/vesalius-api:$tag"
+            docker push "ghcr.io/$OWNER/vesalius-api:$tag"
           done
 

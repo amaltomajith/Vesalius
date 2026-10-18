@@ -174,7 +174,7 @@ sweep -> point and hold -> rest.
 **The guide** (`components/HandGuide.tsx`, moves in `data/guideMoves.ts`, unit-tested): a 3D hand
 (MediaPipe's 21 joints, `data/handPoses.ts`) acting each move on a stand-in body, in a plain
 three.js scene owned by one effect. It opens by itself the first time hands come on
-(`localStorage` `phantom.handGuideSeen`, guarded), and from "How to use".
+(`localStorage` `vesalius.handGuideSeen`, guarded), and from "How to use".
 
 **Interpolation factors** in `AnatomicalModel`: rotation 0.12, position 0.22, scale 0.18.
 These make gesture input feel responsive without jitter.
