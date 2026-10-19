@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   ContractViolation,
+  listStudies,
   loadStudy,
   validateMeshContract,
   type StructuresManifest,
@@ -72,6 +73,28 @@ describe('loadStudy', () => {
     await expect(
       loadStudy({ id: 'x', modality: 'CT', body_part: 'HEAD', shifted_study_date: null, slice_count: 1, thumbnail_artifact_id: null, source: 'pipeline' }),
     ).rejects.toBeInstanceOf(ContractViolation);
+  });
+
+  it('loads an exported study from its static files, and still refuses an uncut face', async () => {
+    const base = import.meta.env.BASE_URL;
+    const fetch = vi.fn(async () => new Response(JSON.stringify(manifest()), { status: 200 }));
+    vi.stubGlobal('fetch', fetch);
+    const study = { id: 'abc', modality: 'CT', body_part: 'HEAD', shifted_study_date: null, slice_count: 1, thumbnail_artifact_id: null, source: 'static' as const };
+    const s = await loadStudy(study);
+    expect(fetch).toHaveBeenCalledWith(`${base}data/studies/abc/structures.json`);
+    expect(s.groupUrl(s.manifest.groups[0])).toBe(`${base}data/studies/abc/mesh/skeletal.glb`);
+
+    const bad = manifest({ deface: { required: true, applied: false, method: 'none' } });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(bad), { status: 200 })));
+    await expect(loadStudy(study)).rejects.toBeInstanceOf(ContractViolation);
+  });
+
+  it('lists the exported studies when there is no pipeline to ask', async () => {
+    const index = { studies: [{ id: 'abc', modality: 'CT', body_part: 'HEAD', shifted_study_date: null, slice_count: 1, thumbnail_artifact_id: 't', credit: '3D Slicer' }] };
+    vi.stubGlobal('fetch', vi.fn(async (url: string) =>
+      url === '/studies' ? new Response('', { status: 502 }) : new Response(JSON.stringify(index), { status: 200 })));
+    const studies = await listStudies();
+    expect(studies.map((s) => [s.id, s.source, s.credit])).toEqual([['abc', 'static', '3D Slicer']]);
   });
 
   it('resolves pipeline groups through the gold-only study route', async () => {

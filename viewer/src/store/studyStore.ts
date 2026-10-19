@@ -9,6 +9,7 @@ import {
   type StudySummary,
 } from '../contract/meshContract';
 import { useLayerStore } from './layerStore';
+import { STATIC } from '../lib/runtime';
 
 export interface StructureInfo extends StructureEntry {
   groupId: string;
@@ -95,7 +96,7 @@ export const useStudyStore = create<SceneState>((set, get) => ({
         shifted_study_date: null,
         slice_count: null,
         thumbnail_artifact_id: null,
-        source: 'pipeline',
+        source: STATIC ? 'static' : 'pipeline',
       },
     );
   },

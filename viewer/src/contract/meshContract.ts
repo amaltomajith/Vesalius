@@ -2,6 +2,8 @@
 // The viewer validates every manifest on load and REFUSES on mismatch -- defence in depth on the
 // one failure that matters: a face on screen next to a study identifier (CLAUDE.md hard rule 4).
 
+import { dataUrl, STATIC } from '../lib/runtime';
+
 export const SUPPORTED_MAJOR = 1;
 
 export interface StructureEntry {
@@ -86,8 +88,9 @@ export interface StudySummary {
   shifted_study_date: string | null;
   slice_count: number | null;
   thumbnail_artifact_id: string | null;
-  source: 'pipeline' | 'demo' | 'atlas' | 'surface';
-  credit?: string;
+  // pipeline: served by the API; static: exported from gold (the static site); atlas; surface
+  source: 'pipeline' | 'static' | 'atlas' | 'surface';
+  credit?: string; // static studies: their public source, shown wherever the study is
 }
 
 export interface LoadedStudy {
@@ -96,19 +99,7 @@ export interface LoadedStudy {
   groupUrl: (g: GroupEntry) => string;
 }
 
-const BASE = import.meta.env.BASE_URL; // "/viewer/"
-
-/** The bundled demo study: a public, CC BY chest CT run through this pipeline (see its CREDIT). */
-export const DEMO_STUDY: StudySummary = {
-  id: 'demo-chest',
-  modality: 'CT',
-  body_part: 'CHEST',
-  shifted_study_date: null,
-  slice_count: 133,
-  thumbnail_artifact_id: null,
-  source: 'demo',
-  credit: 'LIDC-IDRI (TCIA), CC BY 3.0, doi:10.7937/K9/TCIA.2015.LO9QL9SX',
-};
+const BASE = import.meta.env.BASE_URL; // "/app/" served, "/Vesalius/app/" on the static site
 
 /** The full-body atlas (Holoscan's 8 systems): a bundled scene, validated like any study. */
 export const ATLAS_SCENE: StudySummary = {
@@ -122,14 +113,27 @@ export const ATLAS_SCENE: StudySummary = {
   credit: 'Z-Anatomy / BodyParts3D, CC-BY-SA',
 };
 
+/** The exported studies (scripts/export_static.py): the static site's, or a local copy. */
+async function staticStudies(): Promise<StudySummary[]> {
+  try {
+    const r = await fetch(dataUrl('studies.json'));
+    if (!r.ok) return [];
+    const body = (await r.json()) as { studies: Omit<StudySummary, 'source'>[] };
+    return body.studies.map((s) => ({ ...s, source: 'static' as const }));
+  } catch {
+    return [];
+  }
+}
+
 export async function listStudies(): Promise<StudySummary[]> {
+  if (STATIC) return staticStudies();
   try {
     const r = await fetch('/studies');
-    if (!r.ok) return [DEMO_STUDY];
+    if (!r.ok) return staticStudies();
     const body = (await r.json()) as { studies: Omit<StudySummary, 'source'>[] };
-    return [...body.studies.map((s) => ({ ...s, source: 'pipeline' as const })), DEMO_STUDY];
+    return body.studies.map((s) => ({ ...s, source: 'pipeline' as const }));
   } catch {
-    return [DEMO_STUDY]; // no pipeline instance: the viewer still runs on the bundled study
+    return staticStudies(); // no pipeline instance: the viewer still runs on exported studies
   }
 }
 
@@ -196,19 +200,22 @@ export async function loadStudy(summary: StudySummary): Promise<LoadedStudy> {
     const groupUrl = (g: GroupEntry) => `${root}/${g.file}?v=${(g.sha256 ?? '').slice(0, 12)}`;
     return { summary, manifest, groupUrl };
   }
-  const root = summary.source === 'demo' ? `${BASE}demo/chest` : `/studies/${summary.id}`;
-  const url = summary.source === 'demo' ? `${root}/structures.json` : `${root}/structures`;
+  // static: the exported gold files, the same bytes the API serves (scripts/export_static.py)
+  const exported = summary.source === 'static';
+  const root = exported ? dataUrl(`studies/${summary.id}`) : `/studies/${summary.id}`;
+  const url = exported ? `${root}/structures.json` : `${root}/structures`;
   const r = await fetch(url);
   if (!r.ok) throw new Error(`could not load the study manifest (${r.status})`);
   const manifest = (await r.json()) as StructuresManifest;
   validateMeshContract(manifest); // throws ContractViolation -> the study is refused, never shown
   const groupUrl = (g: GroupEntry) =>
-    summary.source === 'demo' ? `${root}/${g.file}` : `/studies/${summary.id}/mesh/${g.id}.glb`;
+    exported ? `${root}/${g.file}` : `/studies/${summary.id}/mesh/${g.id}.glb`;
   return { summary, manifest, groupUrl };
 }
 
 export async function thumbnailUrl(s: StudySummary): Promise<string | null> {
   if (!s.thumbnail_artifact_id) return null;
+  if (s.source === 'static') return dataUrl(`studies/${s.id}/thumb.png`);
   try {
     const r = await fetch(`/artifacts/${s.thumbnail_artifact_id}`);
     if (!r.ok) return null;

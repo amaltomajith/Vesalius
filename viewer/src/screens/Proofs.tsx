@@ -4,6 +4,8 @@ import { api, type Catalogue, type ProofInfo, type ProofJob } from '../lib/api';
 import { Link } from 'react-router';
 import { useToast } from '../app/Shell';
 import { useCanAct } from '../store/authStore';
+import { dataUrl, STATIC } from '../lib/runtime';
+import WakeBackend from '../components/WakeBackend';
 
 type Job = ProofJob | { state: 'running' };
 type Status = 'pass' | 'fail' | 'running' | 'none';
@@ -91,8 +93,9 @@ export default function Proofs() {
       <section className="tile tile--wide page-tile" aria-labelledby="proofs-h">
         <div className="page-tile__copy">
           <h1 id="proofs-h">Proofs</h1>
-          <p className="big-num">{proofs ? `${count('pass')} / ${proofs.length}` : '0'}<span>passing on this machine</span></p>
+          <p className="big-num">{proofs ? `${count('pass')} / ${proofs.length}` : '0'}<span>{STATIC ? 'passing in the last recorded run' : 'passing on this machine'}</span></p>
           <p className="tile-note">Each proof is an automated test that tries to break one promise. One runs at a time.</p>
+          {STATIC && <WakeBackend target="proofs" what="Running a proof yourself" />}
         </div>
         {proofs && (
           <dl className="facts facts--tally">
@@ -122,7 +125,7 @@ export default function Proofs() {
               {p.key === 'face' && (
                 finished?.verdict === 'passed' ? (
                   <figure className="proof-card__figure">
-                    <img src={`/demo/proofs/image?t=${imageStamp}`} alt="The same head with and without face removal, side by side" />
+                    <img src={STATIC ? dataUrl('proofs/defacing.png') : `/demo/proofs/image?t=${imageStamp}`} alt="The same head with and without face removal, side by side" />
                     <figcaption>
                       Left: without face removal, which the pipeline refuses to produce. Right: what it produces. The
                       red circle marks where the nose was.
@@ -154,7 +157,7 @@ export default function Proofs() {
 
               <div className="proof-card__foot">
                 <span className="mono" title={`tests/proofs/${FILE[p.key] ?? ''}`}>tests/proofs/{FILE[p.key] ?? ''}</span>
-                {canAct ? (
+                {STATIC ? null : canAct ? (
                   <button type="button" className="btn btn-dark btn-sm" onClick={() => void run(p.key)} disabled={busy}>
                     <Play size={13} weight="fill" /> Run, about {p.approx_seconds} s
                   </button>

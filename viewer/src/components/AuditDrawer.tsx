@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { X } from '@phosphor-icons/react';
+import { readUrl } from '../lib/runtime';
 
 interface LineageNode {
   stage: string;
@@ -21,7 +22,7 @@ export default function AuditDrawer({ studyId, onClose }: { studyId: string; onC
 
   useEffect(() => {
     let live = true;
-    fetch(`/studies/${studyId}/lineage`)
+    fetch(readUrl(`/studies/${studyId}/lineage`)) // the static site: the exported lineage.json
       .then(async (r) => {
         if (!r.ok) throw new Error(`lineage unavailable (${r.status})`);
         return (await r.json()) as { nodes: LineageNode[] };

@@ -130,7 +130,7 @@ export default function PartInfoPanel({ selectedMesh, onClose, isolated, onToggl
             </ul>
             <div className="context-disclaimer">{DISCLAIMER}</div>
           </div>
-          {current && current.summary.source === 'pipeline' && (
+          {current && (current.summary.source === 'pipeline' || current.summary.source === 'static') && (
             <AiInsight kind="study" node={selectedMesh} label={info.displayName} studyId={current.summary.id} snapshot={null} />
           )}
         </>

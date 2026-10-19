@@ -52,32 +52,22 @@ export default function Studies() {
           const systems = st ? SYSTEMS.filter((k) => st.perSystem[k] > 0).length : null;
           return (
             <Link key={`${s.source}:${s.id}`} className="tile study-tile" to={`/hologram/${s.id}`} data-testid={`study-${s.source}`} data-study-id={s.id}>
-              {s.source === 'demo'
-                ? <span className="study-tile__img study-tile__img--atlas"><Cube size={40} /></span>
-                : <Thumb study={s} className="study-tile__img" />}
+              <Thumb study={s} className="study-tile__img" />
               <div className="study-tile__head">
                 <h2>{s.modality ?? 'CT'} {title(s.body_part)}</h2>
                 {st?.defaceApplied && <span className="chip">face cut</span>}
-                {s.source === 'demo' && <span className="chip">bundled</span>}
               </div>
-              {s.source === 'demo' ? (
-                <dl className="facts">
-                  <div><dt>Slices</dt><dd>{s.slice_count ?? '?'}</dd></div>
-                  <div><dt>Source</dt><dd>TCIA</dd></div>
-                  <div><dt>Works</dt><dd>Offline</dd></div>
-                </dl>
-              ) : (
-                <dl className="facts">
-                  <div><dt>Slices</dt><dd>{s.slice_count ?? '?'}</dd></div>
-                  <div><dt>Structures</dt><dd>{st ? st.total : '…'}</dd></div>
-                  <div><dt>Systems</dt><dd>{systems ?? '…'}</dd></div>
-                </dl>
-              )}
+              <dl className="facts">
+                <div><dt>Slices</dt><dd>{s.slice_count ?? '?'}</dd></div>
+                <div><dt>Structures</dt><dd>{st ? st.total : '…'}</dd></div>
+                <div><dt>Systems</dt><dd>{systems ?? '…'}</dd></div>
+              </dl>
               <p className="study-tile__largest">
-                {st?.largest ? <>Largest: <b>{st.largest.label}</b>, {n.format(Math.round(st.largest.ml))} ml</> : s.source === 'demo' ? s.credit : ' '}
+                {st?.largest ? <>Largest: <b>{st.largest.label}</b>, {n.format(Math.round(st.largest.ml))} ml</> : ' '}
               </p>
+              {s.credit && <p className="study-tile__credit">{s.credit}</p>}
               <span className="study-tile__foot">
-                <span className="mono study-tile__id">{s.source === 'demo' ? 'Bundled with the app' : s.id}</span>
+                <span className="mono study-tile__id">{s.id}</span>
                 <span className="study-tile__open"><Cube size={15} /> Open in 3D <ArrowRight size={14} /></span>
               </span>
             </Link>

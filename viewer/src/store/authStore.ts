@@ -1,7 +1,9 @@
 import { create } from 'zustand';
+import { STATIC } from '../lib/runtime';
 
 // Public mode (deployment): everyone may look, only the admin may run scans, proofs or the AI.
 // Locally the server reports {public: false, admin: true} and nothing in the app changes.
+// The static site has no server at all: public, nobody signed in, never asked.
 interface AuthState {
   loaded: boolean;
   isPublic: boolean;
@@ -24,10 +26,11 @@ async function post(path: string, body?: unknown): Promise<{ public: boolean; ad
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
-  loaded: false,
-  isPublic: false,
-  admin: true,
+  loaded: STATIC,
+  isPublic: STATIC,
+  admin: !STATIC,
   refresh: async () => {
+    if (STATIC) return;
     try {
       const r = await fetch('/auth/me', { credentials: 'same-origin' });
       const me = (await r.json()) as { public: boolean; admin: boolean };

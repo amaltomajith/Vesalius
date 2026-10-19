@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Sparkle } from '@phosphor-icons/react';
 import { aiStatus, streamAtlasInsight, streamStudyInsight, type AiStatus } from '../services/ai';
+import { STATIC } from '../lib/runtime';
+import WakeBackend from './WakeBackend';
 
 type Props =
   | { kind: 'study'; node: string; label: string; studyId: string; snapshot: null }
@@ -33,6 +35,8 @@ export default function AiInsight(props: Props) {
     setError(null);
   }, [props.node]);
 
+  // the static site has no server to hold the key: the AI runs on the live pipeline
+  if (STATIC) return <WakeBackend compact target={props.kind === 'atlas' ? 'body' : 'studies'} what="The AI explanation" />;
   if (!status) return null;
   if (!status.enabled) {
     return (

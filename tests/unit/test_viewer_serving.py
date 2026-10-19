@@ -120,6 +120,25 @@ def test_the_app_holds_no_ai_key_and_calls_no_ai_host(path: Path) -> None:
         assert needle not in text, f"{path.name}: mentions {needle!r}"
 
 
+def test_the_static_site_sends_nothing_when_it_wakes_the_backend() -> None:
+    # the static site (lib/runtime.ts) talks to one thing besides its own files: the wake function,
+    # whose address comes from config.json. Only lib/wake.ts may call it, and never with a body.
+    wake = (VIEWER_SRC / "lib" / "wake.ts").read_text(encoding="utf-8")
+    calls = re.findall(r"fetch\(([^;]*?)\);", wake, flags=re.S)
+    assert len(calls) == 1, calls
+    assert "body" not in calls[0] and "credentials: 'omit'" in calls[0], calls[0]
+    assert "cfg.wakeUrl" in calls[0]
+    others = [
+        p.name
+        for p in _app_sources()
+        if "wakeUrl" in p.read_text(encoding="utf-8")
+        and p.name not in {"wake.ts", "runtime.ts", "WakeBackend.tsx"}
+    ]
+    assert not others, f"the wake address used outside the wake client: {others}"
+    panel = (VIEWER_SRC / "components" / "WakeBackend.tsx").read_text(encoding="utf-8")
+    assert "fetch(" not in panel, "the panel must go through lib/wake.ts"
+
+
 def test_a_patient_study_can_never_send_an_image() -> None:
     ai = (VIEWER_SRC / "services" / "ai.ts").read_text(encoding="utf-8")
     study_req = ai[ai.index("export interface StudyInsightRequest") :]

@@ -24,8 +24,10 @@ real_scans/
 # landing asset builder downloads (source data is fetched, never committed)
 .cache/
 
-# viewer demo study: public CC BY scan output, rebuilt by scripts/bundle_viewer_demo.py
+# exported studies (public scan output): scripts/export_static.py, published by CI, never committed
+viewer/public/data/
 viewer/public/demo/
+site-data/
 
 # local scratch DICOM (pydicom's CT_small + a synthetic series); not needed by any code
 sample_data/

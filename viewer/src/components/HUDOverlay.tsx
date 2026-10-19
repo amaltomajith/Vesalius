@@ -140,7 +140,7 @@ export default function HUDOverlay({
             {handsOn && camera === 'on' ? <Camera size={14} /> : <CameraSlash size={14} />}
             <span className="hud-chip__label">{cameraLabel}</span>
           </button>
-          {!atlas && current?.summary.source === 'pipeline' && (
+          {!atlas && (current?.summary.source === 'pipeline' || current?.summary.source === 'static') && (
             <button className="hud-chip hud-interactive" onClick={() => setShowAudit((v) => !v)} data-testid="audit-toggle" aria-label="Audit trail">
               <TreeStructure size={14} /> <span className="hud-chip__label">Audit trail</span>
             </button>
@@ -234,7 +234,7 @@ export default function HUDOverlay({
           <div className="hud-provenance hud-interactive" data-testid="provenance">
             {atlas
               ? <>Atlas: Z-Anatomy / BodyParts3D, CC-BY-SA · parts under other licences removed</>
-              : <>{current.summary.source === 'demo' ? 'bundled demo · ' : ''}pipeline {m.pipeline_version} · series {m.series_id}</>}
+              : <>{current.summary.credit ? `${current.summary.credit} · ` : ''}pipeline {m.pipeline_version} · series {m.series_id}</>}
           </div>
         )}
 

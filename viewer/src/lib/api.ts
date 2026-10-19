@@ -1,10 +1,14 @@
 // The app's view of the pipeline's HTTP API (all same-origin: /demo/*, /series/*, /studies).
-// Server text is rendered as React text, never as markup.
+// Server text is rendered as React text, never as markup. On the static site (lib/runtime.ts) the
+// reads it knows come from exported files and everything else throws BackendAsleep.
+import { BackendAsleep, readUrl, STATIC } from './runtime';
 
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+  if (STATIC && (options.method ?? 'GET').toUpperCase() !== 'GET') throw new BackendAsleep();
+  const url = readUrl(path);
   let response: Response;
   try {
-    response = await fetch(path, options);
+    response = await fetch(url, options);
   } catch {
     throw new Error('Cannot reach the Vesalius server. Is it still running?');
   }

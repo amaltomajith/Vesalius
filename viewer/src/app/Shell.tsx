@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet } from 'react-router';
 import { LockSimple, PersonArmsSpread, Play, Plus, ShieldCheck, SignOut, SquaresFour, Stack } from '@phosphor-icons/react';
 import { api, type Catalogue } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
+import { landingHref, STATIC } from '../lib/runtime';
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: SquaresFour, end: true },
@@ -16,12 +17,13 @@ interface ToastApi { toast: (text: string) => void }
 const ToastContext = createContext<ToastApi>({ toast: () => {} });
 export const useToast = () => useContext(ToastContext);
 
-type Status = 'idle' | 'busy' | 'offline' | null;
+type Status = 'idle' | 'busy' | 'offline' | 'asleep' | null;
 
 /** The pipeline's state for the top bar: asked on load and every 10 s while the tab is visible. */
 function usePipelineStatus(): Status {
-  const [status, setStatus] = useState<Status>(null);
+  const [status, setStatus] = useState<Status>(STATIC ? 'asleep' : null);
   useEffect(() => {
+    if (STATIC) return; // the static site: the live pipeline is woken on demand (WakeBackend)
     let live = true;
     const ask = () => {
       if (document.hidden) return;
@@ -54,7 +56,7 @@ export default function Shell({ children }: { children?: ReactNode }) {
     <ToastContext.Provider value={{ toast }}>
       <div className="shell">
         <header className="topbar">
-          <a className="brand" href="/" title="About Vesalius">
+          <a className="brand" href={landingHref()} title="About Vesalius">
             <span className="brand-mark" aria-hidden="true" />
             <span>Vesalius</span>
           </a>
@@ -70,11 +72,11 @@ export default function Shell({ children }: { children?: ReactNode }) {
             {status && (
               <span className={`status status--${status}`} role="status">
                 <span className="status__light" aria-hidden="true" />
-                {status === 'busy' ? 'Pipeline working' : status === 'idle' ? 'Pipeline idle' : 'Pipeline offline'}
+                {status === 'busy' ? 'Pipeline working' : status === 'idle' ? 'Pipeline idle' : status === 'asleep' ? 'Showcase · live pipeline asleep' : 'Pipeline offline'}
               </span>
             )}
             <Link className="icon-btn" to="/pipeline" title="Run a scan" aria-label="Run a scan"><Plus size={18} /></Link>
-            {isPublic && (admin ? (
+            {isPublic && !STATIC && (admin ? (
               <button type="button" className="icon-btn" onClick={() => void logout()} title="Sign out" aria-label="Sign out" data-testid="sign-out">
                 <SignOut size={17} />
               </button>

@@ -2,6 +2,8 @@
 // own server; the server holds the key and calls the model. Studies send an id and a node, never
 // pixels (CLAUDE.md hard rule 8); only the atlas may send a snapshot.
 
+import { STATIC } from '../lib/runtime';
+
 export interface AiStatus {
   enabled: boolean;
   vision: boolean;
@@ -10,6 +12,7 @@ export interface AiStatus {
 let statusPromise: Promise<AiStatus> | null = null;
 
 export function aiStatus(): Promise<AiStatus> {
+  if (STATIC) return Promise.resolve({ enabled: false, vision: false }); // no server on the static site
   if (!statusPromise) {
     statusPromise = fetch('/ai/status')
       .then((r) => (r.ok ? (r.json() as Promise<AiStatus>) : { enabled: false, vision: false }))

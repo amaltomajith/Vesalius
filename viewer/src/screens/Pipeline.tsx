@@ -11,6 +11,8 @@ import {
 import { useToast } from '../app/Shell';
 import { useCanAct } from '../store/authStore';
 import PreviewCanvas from '../components/PreviewCanvas';
+import WakeBackend from '../components/WakeBackend';
+import { STATIC } from '../lib/runtime';
 
 type Panel = 'idle' | 'upload' | 'run' | 'result' | 'rejected' | 'error';
 type Body = 'auto' | 'head' | 'chest' | 'abdomen';
@@ -192,6 +194,27 @@ export default function Pipeline() {
 
   const dataset: Dataset | undefined = info?.datasets.find((d) => d.key === selected);
   const locked = panel === 'run' || busy;
+
+  // the static site: no pipeline here; the live one is woken on demand (components/WakeBackend)
+  if (STATIC) {
+    return (
+      <div className="page page--dash">
+        <section className="tile tile--wide gate-tile" data-testid="run-gate">
+          <h1>Run a scan on the live pipeline</h1>
+          <p className="tile-note">
+            Everything the pipeline has published is here already: the studies, the full body and the proof results.
+            To watch it work, run one of its built-in sample scans (synthetic, never a real patient) on the live
+            pipeline.
+          </p>
+          <WakeBackend target="pipeline" what="Running a scan" />
+          <div className="gate-tile__actions">
+            <Link className="btn" to="/studies">Explore the studies</Link>
+            <Link className="btn" to="/body">The full body</Link>
+          </div>
+        </section>
+      </div>
+    );
+  }
 
   // a public showcase: no one but the admin can send it a scan (hard rule 1: never real patient data)
   if (!canAct) {
