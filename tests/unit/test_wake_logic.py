@@ -14,6 +14,8 @@ from pathlib import Path
 import pytest
 
 _path = Path(__file__).parents[2] / "deploy" / "azure" / "wake" / "logic.py"
+if not _path.exists():  # the api image (integration runs) has no deploy/; the checkout always does
+    pytest.skip("deploy/ is not in the api image", allow_module_level=True)
 _spec = importlib.util.spec_from_file_location("wake_logic", _path)
 assert _spec and _spec.loader
 logic = importlib.util.module_from_spec(_spec)
