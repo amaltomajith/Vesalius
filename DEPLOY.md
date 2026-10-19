@@ -1,9 +1,11 @@
 # Deploying Vesalius (free)
 
-A public showcase plus one admin login that unlocks uploads, pipeline runs and proofs. Everything
-below is free (checked October 2026):
+A public showcase plus one admin login that unlocks uploads, pipeline runs and proofs. Nothing
+below needs a credit card (checked October 2026):
 
-- an Oracle Cloud **Always Free** Ampere A1 VM (arm64)
+- an arm64 VM on **Azure for Students**: $100 of credit a year, no card, renewable while you are a
+  student. When the credit runs out Azure disables the subscription; it never bills you.
+  (With a card, Oracle's Always Free A1 runs the same stack at no cost at all: see the end.)
 - a **DuckDNS** name, with **Caddy** for HTTPS
 - **GitHub Actions** for CI and for building the arm64 image, with **ghcr.io** to hold it
 - **UptimeRobot** for alerts
@@ -19,10 +21,12 @@ GitHub (public repo) ── CI on ubuntu-24.04-arm ──> ghcr.io/<you>/vesaliu
 Locally nothing changes: `Start Demo.bat` still runs everything on `127.0.0.1` with no login.
 
 **Why this stack:** research into free hosting, October 2026 (the report "Free hosting for Phantom", written before the product was renamed Vesalius).
-Oracle's A1 is the only always-free machine that can run a segmentation:
-- Free container platforms stop at 1 GB of RAM.
-- Hugging Face Docker Spaces now need a paid plan.
-- Google, AWS and Azure give 1 GB, or credits that run out.
+- Oracle's A1 is the only always-free machine that can run a segmentation, but its signup needs a
+  card.
+- Free container platforms stop at 1 GB of RAM; Hugging Face Docker Spaces now need a paid plan.
+- Azure for Students needs only a school email. Its free B1s VM (1 GB, x64) is too small, so the
+  VM spends credit, and Azure bills by the hour: segment on a big size for an hour, then serve on
+  a small one.
 
 ## What public mode does
 
@@ -54,36 +58,47 @@ Oracle's A1 is the only always-free machine that can run a segmentation:
    - After the first green run, open the package on GitHub (your profile → Packages →
      `vesalius-api` → Package settings) and set its visibility to **Public**. ghcr.io packages
      start private even for public repositories, and the server pulls without a login.
-2. **Oracle Cloud.** Sign up at <https://signup.cloud.oracle.com>.
-   - A phone number and a card are needed for identity; Always Free resources are not charged.
-   - Pick a **home region** with Ampere A1 capacity. It can't be changed later, and all free
-     compute lives there.
-   - Stay on the free account (the decision for this deployment): no Pay As You Go upgrade, so
-     the card can never be billed.
+2. **Azure for Students.** Activate it at <https://azure.microsoft.com/free/students> with your
+   school email. No card.
+   - Never upgrade the subscription to Pay As You Go: then nothing can ever be billed, and when the
+     $100 is spent the VM simply stops.
 3. **DuckDNS.** Log in at <https://www.duckdns.org>, create a subdomain (e.g. `vesalius-yourname`),
    and copy the **token**.
 4. **Groq (optional).** A free API key from <https://console.groq.com> for the AI explanations.
    You put it in `.env` on the server yourself (step 4).
 
-## 2 · The VM (you, in the Oracle console)
+## 2 · The VM (you, in the Azure portal)
 
-1. Compute → Instances → Create:
-   - **Image:** Ubuntu 24.04.
-   - **Shape:** Ampere `VM.Standard.A1.Flex`, **2 OCPU / 12 GB**.
-     - **Not more.** Since 15 June 2026 that is the whole free allowance (it was 4 / 24).
-     - If the account's A1 usage is above it when the trial ends, Oracle deletes the A1 instances.
-   - **Boot volume:** 100 GB (the free allowance is 200 GB of block storage in total).
-   - **SSH key:** add your public key.
-   - **"Out of host capacity" is common.** Retry in another availability domain, or later.
-2. Networking → the VCN → Security List: add ingress rules for **TCP 80 and 443** from
-   `0.0.0.0/0`. Port 22 is already there.
+The sizes are **Arm64** (the `p` in the name), so they run the image CI builds. Prices are
+Central India list prices as tracked in October 2026; the portal shows the current ones before you
+create.
+
+| Size | vCPU / RAM | ≈ per hour | Use |
+|---|---|---|---|
+| `Standard_B4ps_v2` | 4 / 16 GB | $0.09 | the first deploy: loading the studies segments them (~8 GB peak) |
+| `Standard_B2pls_v2` | 2 / 4 GB | $0.022 (≈ $16 a month) | serving: the whole stack idles at ~0.6 GB |
+
+Plus about $9 a month for the disk and the static IP. Serving all month costs about $25, so the
+$100 lasts about 4 months; **Stop** the VM when nobody is looking and it lasts much longer.
+
+1. Virtual machines → Create → Azure virtual machine:
+   - **Region:** Central India, or the nearest the portal offers. Student subscriptions allow only
+     some regions and sizes; if a size is unavailable, try another region.
+   - **Image:** Ubuntu Server 24.04 LTS, **Arm64**.
+   - **Size:** `Standard_B4ps_v2` for now (resized down in §4).
+   - **Authentication:** SSH public key, username `azureuser`.
+   - **Inbound ports:** SSH (22), HTTP (80), HTTPS (443).
+   - **Disks:** OS disk 64 GB, Standard SSD.
+   - **Networking:** a new public IP (Standard SKU, which is static).
+   - **Management:** auto-shutdown **off** (it would take the site down every night).
+2. Cost Management → Budgets: a budget of $100 with alerts at 50 % and 80 %, to your email.
 3. Point the DuckDNS subdomain at the VM's public IP. `setup-server.sh` keeps it updated.
 
 ## 3 · Install (on the VM)
 
 ```bash
-ssh ubuntu@<vm-ip>
-git clone https://github.com/<you>/<repo>.git ~/vesalius      # public: no key needed
+ssh azureuser@<vm-ip>
+git clone https://github.com/amaltomajith/Vesalius.git ~/vesalius   # public: no key needed
 cd ~/vesalius
 sudo bash scripts/deploy/setup-server.sh vesalius-yourname.duckdns.org <duckdns-token>
 exit   # log in again so the docker group applies
@@ -91,7 +106,8 @@ exit   # log in again so the docker group applies
 
 `setup-server.sh` (idempotent: safe to run again):
 - installs Docker
-- opens only 22/80/443
+- opens 80/443 in the host firewall where the image has one (Oracle's); on Azure the network
+  security group from §2 is the firewall
 - adds 4 GB of swap
 - installs the DuckDNS updater
 - turns on automatic security updates
@@ -118,7 +134,13 @@ The first run:
   MinIO no longer publishes images. A few minutes; CI proves the same build on arm64.
 - **Starts the stack and loads the three public CT studies** (head, chest, abdomen). That downloads
   the scans and the segmentation model and segments one study at a time.
-  - It is unmeasured on 2 A1 cores: allow an hour, and write the real time here after the first run.
+  - It is unmeasured on 4 Azure Arm64 cores: allow an hour, and write the real time here after the
+    first run.
+
+**Then resize down** (Azure): once the studies are loaded, VM → Size → `Standard_B2pls_v2`. The
+VM restarts and the stack comes back by itself (Docker starts at boot, the services restart).
+Before an admin "Run a scan" or proof, resize back up to `Standard_B4ps_v2`: a segmentation does
+not fit in 4 GB.
 
 Later updates: push to `main`, wait for CI to go green, then `bash scripts/deploy/deploy.sh`. It
 pulls the code and the new image and restarts.
@@ -166,17 +188,14 @@ same machine, so they don't survive losing it.
 
 ## Limits worth knowing
 
-- **Idle reclamation.** Oracle may reclaim an Always Free instance when its CPU (95th percentile),
-  network and memory all stay under 20% for 7 days.
-  - A quiet showcase can meet that. Uptime pings don't prevent it, because they measure answers,
-    not load.
-  - With the free-only decision, the defences are the rebuild path above and the UptimeRobot
-    alert.
-  - Measure the stack's resident memory against the 20% line (2.4 GB of 12) after the first
-    deploy, and note it here.
-- **2 cores, 12 GB, one heavy job at a time.**
+- **The credit is the clock (Azure).** About 4 months of always-on serving per $100.
+  - Check what is left in the portal's Education hub, and keep the budget alerts.
+  - Stop (deallocate) the VM between showings: a stopped VM costs only its disk and IP.
+  - When the credit is spent the subscription is disabled, not billed; it renews next school year.
+- **One heavy job at a time.**
   - A segmentation, proof or run holds a lock while the others wait (`api/demo_state.HEAVY_LOCK`).
-  - Memory: api 8 GB, Postgres 1 GB, MinIO 1 GB, Caddy 256 MB, plus 4 GB of swap.
+  - Memory limits: api 8 GB, Postgres 1 GB, MinIO 1 GB, Caddy 256 MB, plus 4 GB of swap. On the
+    4 GB serving size these are ceilings, not reservations: idle, the stack uses ~0.6 GB.
 - **arm64.**
   - The image is built natively on GitHub's arm64 runner and smoke-tested there: every heavy import
     plus the unit suite, before it is pushed.
@@ -186,3 +205,23 @@ same machine, so they don't survive losing it.
 - **Never upload real patient scans**, not even as the admin (CLAUDE.md hard rule 1).
 - **Free services change.** This file reflects October 2026 (Oracle halved A1 in June 2026 with no
   announcement). Recheck the limits before relying on them.
+
+## Alternative: Oracle Cloud Always Free (needs a card)
+
+The same stack at no cost at all, if you can pass Oracle's card check (a temporary verification
+hold; Always Free resources are never charged unless the account is upgraded).
+
+1. Sign up at <https://signup.cloud.oracle.com>. Pick a **home region** with Ampere A1 capacity:
+   it can't be changed later, and all free compute lives there. Never upgrade to Pay As You Go.
+2. Compute → Instances → Create:
+   - **Image:** Ubuntu 24.04. **Shape:** Ampere `VM.Standard.A1.Flex`, **2 OCPU / 12 GB**, not
+     more: since 15 June 2026 that is the whole free allowance (it was 4 / 24), and if the
+     account's A1 usage is above it when the trial ends, Oracle deletes the A1 instances.
+   - **Boot volume:** 100 GB (the free allowance is 200 GB in total). **SSH key:** yours.
+   - "Out of host capacity" is common: retry in another availability domain, or later.
+3. Networking → the VCN → Security List: ingress **TCP 80 and 443** from `0.0.0.0/0`.
+4. §3 and §4 as above, logging in as `ubuntu`. No resizing: 12 GB holds a segmentation.
+
+**Idle reclamation:** Oracle may reclaim an Always Free instance when its CPU (95th percentile),
+network and memory all stay under 20% for 7 days. A quiet showcase can meet that, and uptime pings
+don't prevent it; the defences are the rebuild path above and the UptimeRobot alert.

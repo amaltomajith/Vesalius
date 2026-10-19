@@ -229,10 +229,13 @@ Viewer facts worth knowing before touching it:
   Its look lives in `styles/room.css`; details in `refs/VIEWER-CONSTRAINTS.md` design tokens.
 - Holoscan's pre-existing eslint errors are left as they were (minimal edits, VIEWER-CONSTRAINTS).
 
-**Deployment (built, not yet provisioned):** `DEPLOY.md`, all on free services (research
-2026-10-18): one Oracle Cloud Always Free Ampere A1 VM, which is **2 OCPU / 12 GB since 15 June
-2026** (half the old allowance), so one segmentation at a time; DuckDNS + Caddy for HTTPS; the arm64
-api image built on GitHub's free arm64 runners into ghcr.io; UptimeRobot. `VESALIUS_PUBLIC=1` makes
+**Deployment (built, not yet provisioned):** `DEPLOY.md`, nothing needing a card (research
+2026-10-18; the user has no card, 2026-10-19): one arm64 VM on **Azure for Students** ($100 a
+year, disabled not billed when spent), segmenting on `B4ps_v2` (16 GB) then serving on
+`B2pls_v2` (4 GB; the stack idles at ~0.6 GB). Oracle's Always Free A1 (2 OCPU / 12 GB since
+15 June 2026, needs a card) is the documented alternative. DuckDNS + Caddy for HTTPS; the arm64
+api image built on GitHub's free arm64 runners into ghcr.io (github.com/amaltomajith/Vesalius);
+MinIO built from its final upstream source (`docker/minio/`); UptimeRobot. `VESALIUS_PUBLIC=1` makes
 every mutating route admin-only (`src/api/auth.py`, scrypt hash + signed cookie; a unit test fails
 if a new mutating route lacks `require_admin`). The deliberate exception is the AI explanations,
 open to visitors but rate-limited per IP and per day. `docker-compose.prod.yml` + `deploy/Caddyfile`:

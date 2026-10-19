@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# One-time setup of a fresh Ubuntu 24.04 server (Oracle Cloud Always Free Ampere A1, ARM64) for
+# One-time setup of a fresh Ubuntu 24.04 ARM64 server (Azure B2ps_v2 / B2pls_v2, or Oracle's A1) for
 # the public Vesalius showcase. Run it from the cloned repository, as a sudo-capable user:
 #
 #   sudo bash scripts/deploy/setup-server.sh vesalius-yourname.duckdns.org <duckdns-token>
 #
 # Idempotent: safe to run again. It never overwrites an existing .env value or secret file.
 #   1. Docker Engine + the Compose plugin (Docker's own apt repository)
-#   2. firewall: only 22, 80 and 443 in (Oracle's Ubuntu images ship iptables rules that reject
-#      everything else; the VCN security list must ALSO allow 80/443, see DEPLOY.md)
+#   2. firewall: the cloud's own (Azure network security group, Oracle security list) must allow
+#      22/80/443, see DEPLOY.md. Oracle's Ubuntu images ALSO ship host iptables rules that reject
+#      everything else, so 80/443 are opened there, ahead of the first REJECT; Azure's have none.
 #   3. 4 GB swap (S8 peaks around 8 GB; swap is a cushion, not a plan)
 #   4. DuckDNS updater every 5 minutes
 #   5. .env: database/MinIO/de-identification secrets (scripts/setup-demo.sh), the domain, a
@@ -41,13 +42,20 @@ systemctl enable --now docker
 docker compose version
 
 echo "== 2/5 Firewall (22, 80, 443 only)"
-apt-get install -y iptables-persistent >/dev/null
-for port in 80 443; do
-  iptables -C INPUT -p tcp --dport "$port" -m conntrack --ctstate NEW -j ACCEPT 2>/dev/null \
-    || iptables -I INPUT 5 -p tcp --dport "$port" -m conntrack --ctstate NEW -j ACCEPT
-done
-iptables -C INPUT -p udp --dport 443 -j ACCEPT 2>/dev/null || iptables -I INPUT 5 -p udp --dport 443 -j ACCEPT
-netfilter-persistent save
+# the first REJECT rule in INPUT, if the image ships one (Oracle); Azure's images have none
+REJECT_AT="$(iptables -L INPUT --line-numbers -n | awk '$2 == "REJECT" {print $1; exit}')"
+if [ -n "$REJECT_AT" ]; then
+  DEBIAN_FRONTEND=noninteractive apt-get install -y iptables-persistent >/dev/null
+  for port in 80 443; do
+    iptables -C INPUT -p tcp --dport "$port" -m conntrack --ctstate NEW -j ACCEPT 2>/dev/null \
+      || iptables -I INPUT "$REJECT_AT" -p tcp --dport "$port" -m conntrack --ctstate NEW -j ACCEPT
+  done
+  iptables -C INPUT -p udp --dport 443 -j ACCEPT 2>/dev/null \
+    || iptables -I INPUT "$REJECT_AT" -p udp --dport 443 -j ACCEPT
+  netfilter-persistent save
+else
+  echo "   no host REJECT rules: the cloud's network security group decides (DEPLOY.md)"
+fi
 
 echo "== 3/5 Swap"
 if ! swapon --show | grep -q /swapfile; then

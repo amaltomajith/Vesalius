@@ -6,10 +6,10 @@
 #   - Caddy is the only service with host ports (80/443); postgres, minio and the api lose theirs.
 #   - VESALIUS_PUBLIC=1: visitors can look, only the admin can upload, run or prove (src/api/auth.py).
 #   - Presigned gold URLs are signed for https://files.<domain>, which Caddy proxies to MinIO.
-#   - restart policies, memory limits, log rotation. Sized for Oracle's Always Free A1 as it is
-#     since 15 June 2026: 2 OCPU / 12 GB (was 4 / 24). Caddy 256m + postgres 1g + minio 1g + api 8g,
-#     leaving ~1.5 GB for the OS, plus 4 GB swap (setup-server.sh). One heavy job at a time
-#     (api/demo_state.HEAVY_LOCK), so one segmentation is the peak.
+#   - restart policies, memory limits, log rotation. Caddy 256m + postgres 1g + minio 1g + api 8g
+#     are ceilings: one segmentation (~8 GB) needs the 16 GB size (Azure B4ps_v2) or Oracle's
+#     12 GB A1; idle, the stack uses ~0.6 GB, so it serves from 4 GB (B2pls_v2). Plus 4 GB swap
+#     (setup-server.sh). One heavy job at a time (api/demo_state.HEAVY_LOCK).
 # `!reset` needs Docker Compose v2.24+ (installed by scripts/deploy/setup-server.sh).
 
 x-logging: &logging
