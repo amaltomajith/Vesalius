@@ -147,6 +147,55 @@ def ai_limit(request: Request) -> None:
     _ai_day["count"] += 1
 
 
+# ---- runs on the built-in samples, and the proofs: open to visitors, but limited ---------------
+# The samples are synthetic or public test files (pipeline/demo/datasets.py), so letting visitors
+# run them never brings a patient scan in; uploads stay require_admin (hard rule 1). Each run or
+# proof keeps the live backend awake and spends its credit, hence the limits.
+RUNS_PER_IP, PROOFS_PER_IP, HEAVY_WINDOW = 6, 3, 3600.0
+HEAVY_DAILY_CAP_DEFAULT = 60  # runs and proofs together, the whole site, per UTC day
+_heavy_calls: dict[tuple[str, str], deque[float]] = defaultdict(deque)
+_heavy_day: dict[str, Any] = {"day": "", "count": 0}
+
+
+def heavy_daily_cap() -> int:
+    try:
+        return max(0, int(os.environ.get("VESALIUS_RUN_DAILY_CAP", HEAVY_DAILY_CAP_DEFAULT)))
+    except ValueError:
+        return HEAVY_DAILY_CAP_DEFAULT
+
+
+def _heavy_limit(request: Request, kind: str, per_ip: int, too_many: str) -> None:
+    if not public_mode() or is_admin(request):
+        return
+    ip = request.client.host if request.client else "?"
+    now = _clock()
+    calls = _heavy_calls[(kind, ip)]
+    while calls and now - calls[0] > HEAVY_WINDOW:
+        calls.popleft()
+    if len(calls) >= per_ip:
+        raise HTTPException(status_code=429, detail=too_many)
+    today = _today()
+    if _heavy_day["day"] != today:
+        _heavy_day.update(day=today, count=0)
+    if _heavy_day["count"] >= heavy_daily_cap():
+        raise HTTPException(
+            status_code=429,
+            detail="The showcase has run enough scans and proofs for today. Try tomorrow.",
+        )
+    calls.append(now)
+    _heavy_day["count"] += 1
+
+
+def run_limit(request: Request) -> None:
+    """Dependency on POST /demo/runs/sample: RUNS_PER_IP per visitor an hour, and the day cap."""
+    _heavy_limit(request, "run", RUNS_PER_IP, "That is six scans this hour. Try again later.")
+
+
+def proof_limit(request: Request) -> None:
+    """Dependency on POST /demo/proofs/{key}: PROOFS_PER_IP per visitor an hour, plus the cap."""
+    _heavy_limit(request, "proof", PROOFS_PER_IP, "That is three proofs this hour. Try later.")
+
+
 # ---- routes -------------------------------------------------------------------------------------
 
 router = APIRouter(prefix="/auth", tags=["auth"])

@@ -6,28 +6,28 @@
   <title>Vesalius</title>
   <meta name="description" content="Vesalius turns a CT scan into a labelled 3D body you steer with your hands. AI names every structure; nothing that identifies the patient survives.">
   <meta name="theme-color" content="#060b09">
-  <link rel="preload" href="/static/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="/static/fonts/PlayfairDisplay-Italic.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="/static/body/body.bin" as="fetch" crossorigin>
-  <link rel="icon" type="image/svg+xml" href="/app/favicon.svg">
-  <link rel="stylesheet" href="/static/base.css">
-  <link rel="stylesheet" href="/static/landing.css">
+  <link rel="preload" href="static/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="static/fonts/PlayfairDisplay-Italic.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="static/body/body.bin" as="fetch" crossorigin>
+  <link rel="icon" type="image/svg+xml" href="app/favicon.svg">
+  <link rel="stylesheet" href="static/base.css">
+  <link rel="stylesheet" href="static/landing.css">
 </head>
 <body>
   <header class="nav">
     <div class="wrap nav-row">
-      <a class="brand" href="/" aria-label="Vesalius home">
-        <svg class="icon brand-mark" aria-hidden="true"><use href="/static/icons.svg#i-stack"></use></svg>
+      <a class="brand" href="./" aria-label="Vesalius home">
+        <svg class="icon brand-mark" aria-hidden="true"><use href="static/icons.svg#i-stack"></use></svg>
         <span>Vesalius</span>
       </a>
       <nav class="nav-links" aria-label="Sections">
         <a href="#story">How it works</a>
         <a href="#uses">Where it helps</a>
         <a href="#proofs">Proofs</a>
-        <a href="/app/body">Full body</a>
+        <a href="app/body">Full body</a>
       </nav>
-      <a class="btn btn-primary btn-sm" href="/app/">Open Vesalius
-        <svg class="icon icon-nudge" aria-hidden="true"><use href="/static/icons.svg#i-arrow-right"></use></svg></a>
+      <a class="btn btn-primary btn-sm" href="app/">Open Vesalius
+        <svg class="icon icon-nudge" aria-hidden="true"><use href="static/icons.svg#i-arrow-right"></use></svg></a>
     </div>
   </header>
 
@@ -67,8 +67,8 @@
           <h1 id="hero-h">Anatomy you can <em>walk around.</em></h1>
           <p class="lede">A CT scan becomes a labelled 3D body you steer with your hands. AI names every bone, organ and vessel.</p>
           <div class="cta-row">
-            <a class="btn btn-primary" href="/app/">Open Vesalius
-              <svg class="icon icon-nudge" aria-hidden="true"><use href="/static/icons.svg#i-arrow-right"></use></svg></a>
+            <a class="btn btn-primary" href="app/">Open Vesalius
+              <svg class="icon icon-nudge" aria-hidden="true"><use href="static/icons.svg#i-arrow-right"></use></svg></a>
             <a class="btn btn-ghost" href="#story" data-seek>How it works</a>
           </div>
         </section>
@@ -91,8 +91,8 @@
             <h2 id="ch-hands-h">Steer it with <em>your hands.</em></h2>
             <p>Your webcam tracks 21 points on each hand. Pinch and drag to turn, point at a part and hold to select it, sweep your other hand to clear the rest away. The video never leaves your browser.</p>
             <div class="cta-row">
-              <a class="btn btn-primary" href="/app/">Open Vesalius
-                <svg class="icon icon-nudge" aria-hidden="true"><use href="/static/icons.svg#i-arrow-right"></use></svg></a>
+              <a class="btn btn-primary" href="app/">Open Vesalius
+                <svg class="icon icon-nudge" aria-hidden="true"><use href="static/icons.svg#i-arrow-right"></use></svg></a>
             </div>
           </article>
         </div>
@@ -147,7 +147,7 @@
         <div class="tickets">
           <article class="ticket" data-proof="face">
             <div class="ticket-top">
-              <svg class="icon ticket-icon" aria-hidden="true"><use href="/static/icons.svg#i-eye-slash"></use></svg>
+              <svg class="icon ticket-icon" aria-hidden="true"><use href="static/icons.svg#i-eye-slash"></use></svg>
               <h3>The face never reaches <em>a mesh</em></h3>
               <p>Skip defacing on a head scan and the pipeline refuses to build a surface.</p>
             </div>
@@ -158,7 +158,7 @@
           </article>
           <article class="ticket" data-proof="privacy">
             <div class="ticket-top">
-              <svg class="icon ticket-icon" aria-hidden="true"><use href="/static/icons.svg#i-fingerprint"></use></svg>
+              <svg class="icon ticket-icon" aria-hidden="true"><use href="static/icons.svg#i-fingerprint"></use></svg>
               <h3>Planted identifiers are <em>removed</em></h3>
               <p>Fake names, IDs, dates and burned-in text go into a scan. The check counts what survives.</p>
             </div>
@@ -169,7 +169,7 @@
           </article>
           <article class="ticket" data-proof="viewer">
             <div class="ticket-top">
-              <svg class="icon ticket-icon" aria-hidden="true"><use href="/static/icons.svg#i-cube"></use></svg>
+              <svg class="icon ticket-icon" aria-hidden="true"><use href="static/icons.svg#i-cube"></use></svg>
               <h3>The 3D viewer never shows <em>a face</em></h3>
               <p>A head study, loaded exactly as the viewer loads it, has nothing in the face region.</p>
             </div>
@@ -179,22 +179,22 @@
             </div>
           </article>
         </div>
-        <a class="more" href="/app/proofs">Run all five proofs
-          <svg class="icon icon-nudge" aria-hidden="true"><use href="/static/icons.svg#i-arrow-right"></use></svg></a>
+        <a class="more" href="app/proofs">Run all five proofs
+          <svg class="icon icon-nudge" aria-hidden="true"><use href="static/icons.svg#i-arrow-right"></use></svg></a>
       </div>
     </section>
   </main>
 
   <footer class="foot">
     <div class="foot-cta wrap">
-      <a class="diamond" href="/app/"><span>Open Vesalius</span></a>
+      <a class="diamond" href="app/"><span>Open Vesalius</span></a>
     </div>
     <div class="foot-row wrap">
-      <p class="foot-credit">Anatomy statue: derived from Z-Anatomy (CC-BY-SA 4.0) and BodyParts3D, The Database Center for Life Science (CC-BY-SA 2.1 Japan); the derived meshes are CC-BY-SA 4.0, <a href="/static/body/CREDITS.txt">credits</a>. The built-in demo scans are synthetic. Nothing here is evidence about clinical accuracy.</p>
-      <nav aria-label="Footer"><a href="/app/">App</a><a href="/app/body">Full body</a><a href="/docs">API docs</a></nav>
+      <p class="foot-credit">Anatomy statue: derived from Z-Anatomy (CC-BY-SA 4.0) and BodyParts3D, The Database Center for Life Science (CC-BY-SA 2.1 Japan); the derived meshes are CC-BY-SA 4.0, <a href="static/body/CREDITS.txt">credits</a>. The built-in demo scans are synthetic. Nothing here is evidence about clinical accuracy.</p>
+      <nav aria-label="Footer"><a href="app/">App</a><a href="app/body">Full body</a><a class="backend-only" href="docs">API docs</a></nav>
     </div>
     <p class="wordmark" aria-hidden="true">VESALIUS</p>
   </footer>
-  <script type="module" src="/static/landing.js"></script>
+  <script type="module" src="static/landing.js"></script>
 </body>
 </html>

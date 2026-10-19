@@ -102,3 +102,11 @@ def test_every_image_is_built_here_or_pinned_to_a_release() -> None:
                 image = line.split()[1]
                 assert not image.startswith(GONE_REGISTRIES), f"{dockerfile}: {image}"
                 assert _pinned(image), f"{dockerfile}: base image {image!r} needs an explicit tag"
+
+
+def test_the_visitor_caps_set_in_env_reach_the_api() -> None:
+    """The daily caps are read by the api process (src/api/auth.py); a value in .env does nothing
+    unless the production compose file hands it to the container."""
+    env = _prod()["services"]["api"]["environment"]
+    for name in ("VESALIUS_AI_DAILY_CAP", "VESALIUS_RUN_DAILY_CAP"):
+        assert f"${{{name}" in str(env.get(name, "")), f"{name} never reaches the api"

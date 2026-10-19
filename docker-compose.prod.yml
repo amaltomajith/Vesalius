@@ -70,6 +70,9 @@ services:
               "--proxy-headers", "--forwarded-allow-ips", "*"]
     environment:
       VESALIUS_PUBLIC: "1"
+      # what visitors may spend per UTC day, the whole site (src/api/auth.py)
+      VESALIUS_AI_DAILY_CAP: "${VESALIUS_AI_DAILY_CAP:-300}"
+      VESALIUS_RUN_DAILY_CAP: "${VESALIUS_RUN_DAILY_CAP:-60}"
       VESALIUS_ADMIN_PASSWORD_HASH: "${VESALIUS_ADMIN_PASSWORD_HASH:?set it with scripts/deploy/setup-server.sh}"
       VESALIUS_SESSION_SECRET: "${VESALIUS_SESSION_SECRET:?set VESALIUS_SESSION_SECRET in .env}"
       MINIO_PUBLIC_ENDPOINT: files.${VESALIUS_DOMAIN}

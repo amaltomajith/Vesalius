@@ -2,7 +2,7 @@
    and the in-scene labels), the vow (a second pinned stage, scrubbed the same way), reveal-on-entry,
    and live proof verdicts. Server text is only ever inserted with textContent. (ES module: strict.) */
 
-import { HallScene, CHAPTERS, loadBody, webglAvailable, REDUCED } from "/static/hall-scene.js";
+import { HallScene, CHAPTERS, loadBody, webglAvailable, REDUCED } from "./hall-scene.js";
 
 const $ = (id) => document.getElementById(id);
 const clamp01 = (x) => Math.min(1, Math.max(0, x));
@@ -202,7 +202,8 @@ const VERDICT = {
 async function paintProofs() {
   let last = {};
   try {
-    const r = await fetch("/demo/proofs/last");
+    // relative to the page: the API's route, or on the static site the exported copy at that path
+    const r = await fetch("demo/proofs/last");
     if (r.ok) last = await r.json();
   } catch (e) { return; } // offline or server busy: the "not run yet" chips stay
   document.querySelectorAll("[data-proof]").forEach((cell) => {

@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CheckCircle, CircleDashed, CircleNotch, EyeSlash, Play, XCircle } from '@phosphor-icons/react';
 import { api, type Catalogue, type ProofInfo, type ProofJob } from '../lib/api';
-import { Link } from 'react-router';
 import { useToast } from '../app/Shell';
-import { useCanAct } from '../store/authStore';
 import { dataUrl, STATIC } from '../lib/runtime';
 import WakeBackend from '../components/WakeBackend';
 
@@ -42,7 +40,6 @@ export default function Proofs() {
   const [proofs, setProofs] = useState<ProofInfo[] | null>(null);
   const [jobs, setJobs] = useState<Record<string, Job>>({});
   const [busy, setBusy] = useState(false);
-  const canAct = useCanAct();   // a public showcase: the admin runs the proofs, everyone sees the results
   const [imageStamp, setImageStamp] = useState(0);
   const timer = useRef<number | undefined>(undefined);
 
@@ -157,12 +154,12 @@ export default function Proofs() {
 
               <div className="proof-card__foot">
                 <span className="mono" title={`tests/proofs/${FILE[p.key] ?? ''}`}>tests/proofs/{FILE[p.key] ?? ''}</span>
-                {STATIC ? null : canAct ? (
+                {/* anyone may run a proof (rate-limited on a public deployment, src/api/auth.py proof_limit);
+                    the static site has no pipeline: its WakeBackend panel is above */}
+                {!STATIC && (
                   <button type="button" className="btn btn-dark btn-sm" onClick={() => void run(p.key)} disabled={busy}>
                     <Play size={13} weight="fill" /> Run, about {p.approx_seconds} s
                   </button>
-                ) : (
-                  <Link className="btn btn-sm" to="/login?next=/proofs" data-testid="proof-sign-in">Admin runs this</Link>
                 )}
               </div>
             </li>

@@ -2,7 +2,7 @@
 # One-time setup of a fresh Ubuntu 24.04 ARM64 server (Azure B2ps_v2 / B2pls_v2, or Oracle's A1) for
 # the public Vesalius showcase. Run it from the cloned repository, as a sudo-capable user:
 #
-#   sudo bash scripts/deploy/setup-server.sh vesalius-yourname.duckdns.org <duckdns-token>
+#   sudo bash scripts/deploy/setup-server.sh vesalius-yourname.duckdns.org <duckdns-token> [--autostop]
 #
 # Idempotent: safe to run again. It never overwrites an existing .env value or secret file.
 #   1. Docker Engine + the Compose plugin (Docker's own apt repository)
@@ -15,10 +15,13 @@
 #      session secret and the CI image name. The admin password is set by scripts/deploy/deploy.sh
 #      on its first run; the Groq key, if any, you add yourself.
 #   6. automatic security updates
+#   7. with --autostop (the on-demand Azure backend): a timer that deallocates the VM when idle
+#      (scripts/deploy/autostop.sh; the VM's managed identity may deallocate it, provision.sh)
 set -euo pipefail
 
 DOMAIN="${1:?usage: setup-server.sh <name>.duckdns.org <duckdns-token>}"
 TOKEN="${2:?usage: setup-server.sh <name>.duckdns.org <duckdns-token>}"
+AUTOSTOP="${3:-}"
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 OWNER="${SUDO_USER:-$(id -un)}"
 [ "$(id -u)" -eq 0 ] || { echo "Run with sudo." >&2; exit 1; }
@@ -104,5 +107,33 @@ cat > /etc/apt/apt.conf.d/20auto-upgrades <<'APT'
 APT::Periodic::Update-Package-Lists "1";
 APT::Periodic::Unattended-Upgrade "1";
 APT
+
+if [ "$AUTOSTOP" = "--autostop" ]; then
+  echo "== autostop: deallocate this VM when the backend is idle (scripts/deploy/autostop.sh)"
+  cat > /etc/systemd/system/vesalius-autostop.service <<UNIT
+[Unit]
+Description=Deallocate this VM when the Vesalius backend is idle
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=$REPO
+EnvironmentFile=-$REPO/.env
+ExecStart=/usr/bin/env bash $REPO/scripts/deploy/autostop.sh
+UNIT
+  cat > /etc/systemd/system/vesalius-autostop.timer <<'UNIT'
+[Unit]
+Description=Check every minute whether the Vesalius backend is idle
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+
+[Install]
+WantedBy=timers.target
+UNIT
+  systemctl daemon-reload
+  systemctl enable --now vesalius-autostop.timer
+fi
 
 echo "Done. Log out and back in (docker group), then run:  bash scripts/deploy/deploy.sh"

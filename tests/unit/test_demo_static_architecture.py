@@ -264,7 +264,7 @@ def test_the_statue_is_credited_under_its_share_alike_licence() -> None:
     credits = (STATIC / "body" / "CREDITS.txt").read_text(encoding="utf-8")
     assert "Z-Anatomy" in credits and "BodyParts3D" in credits and "CC-BY-SA 4.0" in credits
     landing = (STATIC / "landing.html").read_text(encoding="utf-8")
-    assert "Z-Anatomy" in landing and "/static/body/CREDITS.txt" in landing
+    assert "Z-Anatomy" in landing and 'href="static/body/CREDITS.txt"' in landing
 
 
 def test_the_real_scan_is_credited_with_its_unrestricted_use_statement() -> None:
@@ -351,3 +351,19 @@ def test_the_landing_story_is_four_beats_and_privacy_is_one_of_them() -> None:
     # the privacy beat says what is removed, in plain words
     privacy = html[html.index('data-ch="privacy"') : html.index('data-ch="ai"')]
     assert all(w in privacy for w in ("Names", "IDs", "dates", "face"))
+
+
+ROOT_ABSOLUTE = re.compile(
+    r"""(?:href|src)=["']/(?!/)"""  # href="/x", not href="//cdn"
+    r"""|url\(["']?/(?!/)"""  # CSS url(/x)
+    r"""|(?:from|fetch\()\s*["']/(?!/)"""  # import ... from "/x", fetch("/x")
+)
+
+
+def test_the_landing_page_uses_only_relative_paths() -> None:
+    """The same files are the API's landing page at / and the static site's at /Vesalius/ (GitHub
+    Pages, a sub-path): a root-absolute path would point outside the static site."""
+    for name in ("landing.html", "landing.js", "hall-scene.js", "base.css", "landing.css"):
+        text = (STATIC / name).read_text(encoding="utf-8")
+        found = re.findall(ROOT_ABSOLUTE, text)
+        assert not found, f"{name}: root-absolute path(s) {found}"

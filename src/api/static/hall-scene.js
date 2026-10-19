@@ -9,7 +9,7 @@
    its identity is stripped and the face cut, the slices close up, the marble opens to the labelled
    systems inside, and a hand turns it. */
 
-import * as THREE from "/static/vendor/three.module.min.js";
+import * as THREE from "./vendor/three.module.min.js";
 
 const REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const clamp01 = (x) => Math.min(1, Math.max(0, x));
@@ -90,8 +90,8 @@ let bodyPromise = null;
 export function loadBody() {
   if (!bodyPromise) {
     bodyPromise = Promise.all([
-      fetch("/static/body/body.json").then((r) => r.json()),
-      fetch("/static/body/body.bin").then((r) => r.arrayBuffer()),
+      fetch(new URL("./body/body.json", import.meta.url)).then((r) => r.json()),
+      fetch(new URL("./body/body.bin", import.meta.url)).then((r) => r.arrayBuffer()),
     ]).then(([meta, buf]) => ({
       meta,
       systems: meta.systems.map((s) => ({

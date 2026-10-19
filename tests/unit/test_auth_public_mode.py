@@ -19,8 +19,16 @@ from pipeline.common.config import Settings
 from pipeline.storage.object_store import gold_presign_client
 
 OPEN_WRITES = {"/auth/login", "/auth/logout"}  # the only non-GET routes a visitor may call freely
-# open to visitors on purpose (user decision 2026-10-18), but only through the AI rate limit
-RATE_LIMITED = {"/ai/explain/study", "/ai/explain/atlas"}
+# open to visitors on purpose, each only through its own rate limit (user decisions: the AI
+# 2026-10-18; the built-in samples and the proofs 2026-10-19, for the on-demand live backend)
+RATE_LIMITED = {
+    "/ai/explain/study": auth.ai_limit,
+    "/ai/explain/atlas": auth.ai_limit,
+    "/demo/runs/sample": auth.run_limit,
+    "/demo/proofs/{key}": auth.proof_limit,
+}
+# hard rule 1: nothing a visitor can send in. Named here so loosening RATE_LIMITED cannot open them.
+ADMIN_ONLY = {"/demo/runs/upload", "/ingest"}
 
 
 def _all_routes(routes: list[Any]) -> list[APIRoute]:
@@ -65,9 +73,16 @@ def test_there_are_mutating_routes_to_protect() -> None:
 def test_every_mutating_route_requires_the_admin(route: APIRoute) -> None:
     calls = {d.call for d in route.dependant.dependencies}
     if route.path in RATE_LIMITED:
-        assert auth.ai_limit in calls, f"{route.path} is open to visitors without its rate limit"
+        assert RATE_LIMITED[route.path] in calls, f"{route.path} is open without its rate limit"
         return
     assert auth.require_admin in calls, f"{route.path} can be called by anyone in public mode"
+
+
+def test_nothing_can_be_sent_in_by_a_visitor() -> None:
+    routes = {r.path: r for r in _mutating_routes()}
+    assert set(routes) >= ADMIN_ONLY and not ADMIN_ONLY & set(RATE_LIMITED)
+    for path in ADMIN_ONLY:
+        assert auth.require_admin in {d.call for d in routes[path].dependant.dependencies}, path
 
 
 def test_a_visitor_is_refused_on_every_mutating_route(public: str) -> None:
@@ -99,9 +114,11 @@ def test_the_admin_can_sign_in_and_act(public: str) -> None:
     assert "httponly" in cookie and "secure" in cookie and "samesite=strict" in cookie
     assert client.get("/auth/me").json() == {"public": True, "admin": True}
     assert client.post("/demo/runs/sample", json={"dataset": "nope"}).status_code == 400
+    # uploads are the admin's alone: signed in, the request gets past the guard to validation
+    assert client.post("/demo/runs/upload", data={}).status_code == 422
     client.post("/auth/logout")
     client.cookies.clear()
-    assert client.post("/demo/runs/sample", json={"dataset": "nope"}).status_code == 401
+    assert client.post("/demo/runs/upload", data={}).status_code == 401
 
 
 def test_wrong_passwords_are_rate_limited(public: str) -> None:
@@ -195,3 +212,54 @@ def test_locally_the_ai_has_no_limit(monkeypatch: pytest.MonkeyPatch) -> None:
     client = TestClient(api_main.create_app())
     assert all(_explain(client) == 200 for _ in range(15))
 
+
+# ---- runs on the built-in samples and the proofs: open to visitors, limited -------------------
+
+
+@pytest.fixture
+def heavy_open(public: str, monkeypatch: pytest.MonkeyPatch) -> dict[str, float]:
+    """A public server; the limit is checked before the route, so an unknown sample or proof shows
+    whether the limit let the call through (400/404) or refused it (429). Nothing ever runs."""
+    clock = {"t": 1000.0}
+    monkeypatch.setattr(auth, "_clock", lambda: clock["t"])
+    monkeypatch.setattr(auth, "_today", lambda: "2026-10-19")
+    auth._heavy_calls.clear()
+    auth._heavy_day.update(day="", count=0)
+    return clock
+
+
+def _run(client: TestClient) -> int:
+    return client.post("/demo/runs/sample", json={"dataset": "not-a-sample"}).status_code
+
+
+def _prove(client: TestClient) -> int:
+    return client.post("/demo/proofs/not-a-proof").status_code
+
+
+def test_a_visitor_may_run_six_samples_and_three_proofs_an_hour(
+    heavy_open: dict[str, float],
+) -> None:
+    client = TestClient(api_main.create_app())
+    assert [_run(client) for _ in range(7)] == [400] * 6 + [429]
+    assert [_prove(client) for _ in range(4)] == [404] * 3 + [429]   # its own allowance
+    heavy_open["t"] += 3601
+    assert (_run(client), _prove(client)) == (400, 404)
+
+
+def test_the_site_stops_at_its_daily_run_cap(
+    heavy_open: dict[str, float], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("VESALIUS_RUN_DAILY_CAP", "2")
+    clients = [TestClient(api_main.create_app(), client=(f"10.0.1.{i}", 50000)) for i in range(4)]
+    assert [_run(clients[0]), _prove(clients[1]), _run(clients[2]), _prove(clients[3])] == [
+        400, 404, 429, 429,
+    ]
+    monkeypatch.setattr(auth, "_today", lambda: "2026-10-20")
+    assert _run(clients[3]) == 400
+
+
+def test_a_visitor_still_cannot_upload(heavy_open: dict[str, float]) -> None:
+    client = TestClient(api_main.create_app())
+    files = {"file": ("scan.zip", b"PK", "application/zip")}
+    data = {"acknowledged": "true", "preset": "bone"}
+    assert client.post("/demo/runs/upload", files=files, data=data).status_code == 401

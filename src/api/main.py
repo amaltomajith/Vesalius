@@ -10,6 +10,7 @@ from pipeline.common.logging import configure_logging
 def create_app() -> FastAPI:
     configure_logging()
     app = FastAPI(title="Vesalius API")
+    app.middleware("http")(health.note_activity)  # /health/idle: the live backend sleeps when idle
     app.include_router(health.router)
     app.include_router(ingest.router)
     app.include_router(catalog.router)

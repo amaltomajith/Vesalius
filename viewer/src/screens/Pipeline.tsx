@@ -216,26 +216,6 @@ export default function Pipeline() {
     );
   }
 
-  // a public showcase: no one but the admin can send it a scan (hard rule 1: never real patient data)
-  if (!canAct) {
-    return (
-      <div className="page page--dash">
-        <section className="tile tile--wide gate-tile" data-testid="run-gate">
-          <h1>Running the pipeline is for the admin</h1>
-          <p className="tile-note">
-            This is a public showcase, so uploads and runs are switched off: no one can send it a real
-            patient scan. Everything the pipeline has already published is open to explore.
-          </p>
-          <div className="gate-tile__actions">
-            <Link className="btn btn-dark" to="/studies">Explore the studies</Link>
-            <Link className="btn" to="/body">The full body</Link>
-            <Link className="btn" to="/login?next=/pipeline" data-testid="gate-sign-in">Admin sign in</Link>
-          </div>
-        </section>
-      </div>
-    );
-  }
-
   return (
     <div className="page page--pipeline">
       <header className="page-head">
@@ -288,7 +268,20 @@ export default function Pipeline() {
             </div>
           )}
 
-          {panel === 'upload' && (
+          {/* a public showcase: visitors run the built-in samples (rate-limited, src/api/auth.py run_limit);
+              only the admin may send it a file, so no one can upload a real patient scan (hard rule 1) */}
+          {panel === 'upload' && !canAct && (
+            <div className="panel" data-testid="upload-gate">
+              <h2 className="panel__title">Uploading is for the admin</h2>
+              <p className="lede">
+                This is a public showcase: nobody can send it a file, so no real patient scan can reach it. The sample
+                scans on the left run the same pipeline, end to end.
+              </p>
+              <Link className="btn" to="/login?next=/pipeline" data-testid="gate-sign-in">Admin sign in</Link>
+            </div>
+          )}
+
+          {panel === 'upload' && canAct && (
             <form className="panel" onSubmit={(e) => void submitUpload(e)} noValidate data-testid="panel-upload">
               <h2 className="panel__title">Upload a scan</h2>
               <p className="lede">Only public or anonymous data. The original is kept exactly as received in restricted storage.</p>

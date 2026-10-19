@@ -2,8 +2,8 @@
    Fonts: Geist + Geist Mono (OFL, fonts/OFL.txt). Icons: Phosphor sprite (MIT, icons.svg).
    Shape rule: panels/inputs 10px, buttons/chips full pill. One accent: teal. */
 
-@font-face { font-family: "Geist"; src: url("/static/fonts/Geist-Variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
-@font-face { font-family: "Geist Mono"; src: url("/static/fonts/GeistMono-Variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "Geist"; src: url("fonts/Geist-Variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "Geist Mono"; src: url("fonts/GeistMono-Variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
 
 /* Light by default: clinical bone-white + surgical green, locked rather than following the OS.
    The landing page overrides these tokens with its own dark set (landing.css; the user chose a

@@ -3,7 +3,7 @@
    diamond + wordmark footer. Shape rule: cards and panels are sharp (0), the proof tickets are the
    one rounded card (16px); buttons and chips are full pills. Mobile collapses at 860px. */
 
-@font-face { font-family: "Playfair Display"; src: url("/static/fonts/PlayfairDisplay-Italic.woff2") format("woff2"); font-style: italic; font-weight: 400; font-display: swap; }
+@font-face { font-family: "Playfair Display"; src: url("fonts/PlayfairDisplay-Italic.woff2") format("woff2"); font-style: italic; font-weight: 400; font-display: swap; }
 
 :root {
   color-scheme: dark;
@@ -297,3 +297,6 @@ h1 em, h2 em, h3 em {
   .js .use-grid .reveal:nth-child(3) { transition-delay: 0.16s; }
   .js .use-grid .reveal:nth-child(4) { transition-delay: 0.24s; }
 }
+
+/* the static site (GitHub Pages) has no API: links that need one are hidden there */
+[data-static] .backend-only { display: none; }

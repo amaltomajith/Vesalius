@@ -23,7 +23,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from api import demo_state
-from api.auth import require_admin
+from api.auth import proof_limit, require_admin, run_limit
 from api.dependencies import serving_session_dependency, settings_dependency
 from pipeline.common.config import Settings
 from pipeline.demo import datasets, declaration, proofs
@@ -64,7 +64,7 @@ def list_datasets() -> dict[str, Any]:
     }
 
 
-@router.post("/runs/sample", dependencies=[Depends(require_admin)])
+@router.post("/runs/sample", dependencies=[Depends(run_limit)])  # synthetic/public samples
 def start_sample(request: SampleRequest) -> dict[str, str]:
     if request.dataset not in datasets.DATASETS:
         raise HTTPException(status_code=400, detail="Unknown sample scan.")
@@ -158,7 +158,7 @@ def get_run(run_id: str) -> dict[str, Any]:
 # ---- proofs ------------------------------------------------------------------------------------
 
 
-@router.post("/proofs/{key}", dependencies=[Depends(require_admin)])
+@router.post("/proofs/{key}", dependencies=[Depends(proof_limit)])
 def start_proof(key: str) -> dict[str, str]:
     if key not in proofs.PROOFS:
         raise HTTPException(status_code=404, detail="Unknown proof.")
