@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -34,7 +35,9 @@ esac
 VM_ID = "/subscriptions/s/resourceGroups/g/providers/Microsoft.Compute/virtualMachines/v"
 
 
-def _run(tmp_path: Path, uptime: int, idle_json: str | None) -> tuple[str, str]:
+def _run(
+    tmp_path: Path, uptime: int, idle_json: str | None, hold_age: int | None = None
+) -> tuple[str, str]:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir(exist_ok=True)
     for name, body in (("docker", FAKE_DOCKER), ("curl", FAKE_CURL)):
@@ -49,7 +52,11 @@ def _run(tmp_path: Path, uptime: int, idle_json: str | None) -> tuple[str, str]:
         "FAKE_IDLE_JSON": idle_json or "",
         "CALLS": str(calls),
         "VM_ID": VM_ID,
+        "VESALIUS_AUTOSTOP_HOLD": str(tmp_path / "hold"),
     }
+    if hold_age is not None:  # a deploy in progress, or maintenance
+        (tmp_path / "hold").touch()
+        os.utime(tmp_path / "hold", (time.time() - hold_age, time.time() - hold_age))
     out = subprocess.run(["bash", str(SCRIPT)], env=env, capture_output=True, text=True, check=True)
     return out.stdout.strip(), calls.read_text()
 
@@ -89,3 +96,13 @@ def test_the_limits_are_configurable(tmp_path: Path, monkeypatch: pytest.MonkeyP
     monkeypatch.setenv("VESALIUS_IDLE_MINUTES", "30")
     decision, _ = _run(tmp_path, 1200, _idle(900))
     assert decision.startswith("autostop: keep")
+
+
+def test_a_deploy_or_maintenance_holds_it_awake(tmp_path: Path) -> None:
+    decision, calls = _run(tmp_path, 1200, None, hold_age=60)  # first setup: no api yet, idle
+    assert decision.startswith("autostop: keep: held") and calls == ""
+
+
+def test_a_forgotten_hold_expires_at_the_hard_limit(tmp_path: Path) -> None:
+    decision, calls = _run(tmp_path, 1200, None, hold_age=4 * 3600)
+    assert decision.startswith("autostop: stop") and "/deallocate" in calls

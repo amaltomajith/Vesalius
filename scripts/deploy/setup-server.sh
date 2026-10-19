@@ -132,6 +132,8 @@ OnUnitActiveSec=1min
 [Install]
 WantedBy=timers.target
 UNIT
+  # held awake until the first deploy.sh finishes (it removes the hold), or at most the hard limit
+  sudo -u "$OWNER" touch "$REPO/.autostop-hold"
   systemctl daemon-reload
   systemctl enable --now vesalius-autostop.timer
 fi

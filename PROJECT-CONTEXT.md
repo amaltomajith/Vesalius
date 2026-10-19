@@ -332,7 +332,7 @@ fallback; `/console` and `/viewer` redirect to it.
 
 **Licensing rules:**
 - **Scans are never committed.** They are fetched by `scripts/fetch_public_ct.py` and
-  `scripts/load_demo_studies.py`; `sample_data/` and `viewer/public/demo/` are gitignored.
+  `scripts/load_demo_studies.py`; `sample_data/` and `viewer/public/data/` are gitignored.
 - **A head sample was rejected.** The Medimodel sample was "All Rights Reserved", and its launcher
   was deleted.
 - **The anatomy atlas** is CC-BY-SA 4.0 with credits, minus the excluded parts.

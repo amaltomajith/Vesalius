@@ -32,6 +32,16 @@ export default function WakeBackend({ target, what, compact = false }: { target:
   }, []);
 
   if (!cfg) return null;
+  const direct = !cfg.wakeUrl ? backendTarget(cfg, target) : null;
+  if (direct) {
+    // an always-on backend (no wake function): just open it
+    return (
+      <div className={compact ? 'wake wake--compact' : 'wake'} data-testid="wake">
+        <p className="wake__lede">{what} runs on the live pipeline.</p>
+        <a className="btn btn-dark" href={direct}>Open the live pipeline</a>
+      </div>
+    );
+  }
   if (!cfg.wakeUrl) {
     return <p className={compact ? 'ai-off' : 'tile-note'} data-testid="wake-none">{what} runs on the live pipeline, which this copy of the site does not offer.</p>;
   }

@@ -31,3 +31,5 @@ site-data/
 
 # local scratch DICOM (pydicom's CT_small + a synthetic series); not needed by any code
 sample_data/
+.rehearsal-site/
+.autostop-hold

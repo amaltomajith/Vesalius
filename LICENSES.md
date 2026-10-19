@@ -18,7 +18,7 @@ confirmed, do not ship it.
 | 3D Slicer sample "CT-MR Brain" (`CT-brain.nrrd`, sha256 `6a5b6cac…`) | Donated "to be used without any restrictions" | Slicer `SampleData.py` | Landing page head scan (defaced gold output only ships) |
 | TCIA LIDC-IDRI, patient LIDC-IDRI-0001, one chest CT series (133 images) | CC BY 3.0 | TCIA API `LicenseName` per series, checked by `scripts/fetch_public_ct.py`; DOI 10.7937/K9/TCIA.2015.LO9QL9SX | Phase two chest study |
 | TCIA C4KC-KiTS, patient KiTS-00002, one abdomen CT series (256 images) | CC BY 3.0 | same; DOI 10.7937/TCIA.2019.IX49E8NX | Phase two abdomen study |
-| Viewer demo study (`viewer/public/demo/chest`) | CC BY 3.0 (LIDC-IDRI, as above) | pipeline gold output of the LIDC chest series, rebuilt by `scripts/bundle_viewer_demo.py`, never committed; `CREDIT.txt` travels with it and the picker shows the DOI | Viewer runs without a pipeline instance |
+| Static site studies (`site-data`, the `static-data` release; never committed) | as above, per study | pipeline gold output of the three studies above, exported by `scripts/export_static.py` (refuses any study without a known public source); each study's `CREDIT.txt` travels with it, and the Studies screen and the hologram show its credit and DOI | The static site (GitHub Pages, DEPLOY.md part A) |
 
 **TCIA Data Usage Policy** (shipped inside every TCIA download, recorded in the provenance
 JSON): acknowledge the dataset and its DOI wherever the data is presented, and never use it to

@@ -30,7 +30,8 @@ jobs:
           if git grep -nIE 'gsk_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----' -- . ':!.github/workflows/ci.yml'; then
             echo "::error::a key is committed"; bad=1
           fi
-          if git ls-files | grep -iE '\.(dcm|nii|nii\.gz|nrrd|mha)$|(^|/)\.env$|^secrets/[^.]|^sample_data/|^real_scans/'; then
+          # exported studies (scripts/export_static.py) are published by pages.yml, never committed
+          if git ls-files | grep -iE '\.(dcm|nii|nii\.gz|nrrd|mha)$|(^|/)\.env$|^secrets/[^.]|^sample_data/|^real_scans/|^viewer/public/(data|demo)/|^site-data'; then
             echo "::error::a scan, .env or secret file is committed"; bad=1
           fi
           exit $bad
@@ -43,7 +44,7 @@ jobs:
           python-version: "3.11"
           cache: pip
       - run: pip install -e ".[dev]"
-      - run: ruff check src tests scripts
+      - run: ruff check src tests scripts deploy
       - run: mypy src
       - run: pytest -q -m "not integration and not ocr"
 

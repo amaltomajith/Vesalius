@@ -208,8 +208,11 @@ Viewer facts worth knowing before touching it:
 
 - Build: `cd viewer && npm ci && npm run build` (prebuild vendors MediaPipe), tests `npm test`
   (vitest). The api image builds it in a Node stage and serves it at `/viewer/`.
-- Demo study: `python scripts/bundle_viewer_demo.py --api <url>` pulls a served chest study into
-  `viewer/public/demo/` (gitignored, like every public scan).
+- Static mode (`vite build --mode pages`, `src/lib/runtime.ts`): the same app with no server, for
+  GitHub Pages. Reads map onto files exported from gold by `scripts/export_static.py` (fails
+  closed: undefaced/uncut head, a mesh matching no gold record, no public source, proof 5 not
+  passed); everything live shows `WakeBackend`. Locally, an export copied into
+  `viewer/public/data/` (gitignored) is the fallback when no API answers.
 - GEOMETRY.md exports Posterior -> +Z, so the viewer turns every study half a turn about the
   vertical axis to face the camera. A rotation, never a mirror.
 - The AI vision path is removed, not flagged off: MEASUREMENTS & CONTEXT is computed locally from
@@ -229,16 +232,20 @@ Viewer facts worth knowing before touching it:
   Its look lives in `styles/room.css`; details in `refs/VIEWER-CONSTRAINTS.md` design tokens.
 - Holoscan's pre-existing eslint errors are left as they were (minimal edits, VIEWER-CONSTRAINTS).
 
-**Deployment (built, not yet provisioned):** `DEPLOY.md`, nothing needing a card (research
-2026-10-18; the user has no card, 2026-10-19): one arm64 VM on **Azure for Students** ($100 a
-year, disabled not billed when spent), segmenting on `B4ps_v2` (16 GB) then serving on
-`B2pls_v2` (4 GB; the stack idles at ~0.6 GB). Oracle's Always Free A1 (2 OCPU / 12 GB since
-15 June 2026, needs a card) is the documented alternative. DuckDNS + Caddy for HTTPS; the arm64
-api image built on GitHub's free arm64 runners into ghcr.io (github.com/amaltomajith/Vesalius);
-MinIO built from its final upstream source (`docker/minio/`); UptimeRobot. `VESALIUS_PUBLIC=1` makes
-every mutating route admin-only (`src/api/auth.py`, scrypt hash + signed cookie; a unit test fails
-if a new mutating route lacks `require_admin`). The deliberate exception is the AI explanations,
-open to visitors but rate-limited per IP and per day. `docker-compose.prod.yml` + `deploy/Caddyfile`:
+**Deployment (built, not yet provisioned):** `DEPLOY.md`, nothing needing a card (the user has
+none; decided 2026-10-19). (A) GitHub Pages, free and always on: landing + app in static mode +
+atlas + the exported studies and proof results (`.github/workflows/pages.yml`; its `data` job runs
+the pipeline and the proofs in CI and publishes the export as the `static-data` release asset,
+never committed; `scripts/build_pages_site.sh`). (B) optional live pipeline on Azure for Students
+($100/yr, disabled not billed when spent), woken on demand: `deploy/azure/wake` (Flex Consumption
+function, daily cap) starts an Arm64 `B4ps_v2` VM; `scripts/deploy/autostop.sh` deallocates it when
+idle (`/health/idle`; a `.autostop-hold` file keeps it up during deploys); `deploy/azure/provision.sh`
+creates it all from Cloud Shell. Oracle's Always Free A1 (needs a card) is the documented
+alternative. DuckDNS + Caddy for HTTPS; the arm64 api image built on GitHub's free arm64 runners
+into ghcr.io (github.com/amaltomajith/Vesalius); MinIO built from its final upstream source
+(`docker/minio/`). `VESALIUS_PUBLIC=1`: uploads and `/ingest` admin-only (scrypt hash + signed
+cookie); visitors may run the built-in samples and the proofs (`run_limit`/`proof_limit`) and ask
+the AI (`ai_limit`), all rate-limited; a unit test walks the route table. `docker-compose.prod.yml` + `deploy/Caddyfile`:
 Caddy is the only host port; `files.<domain>` serves GET/HEAD `/gold/*` only. The ARM64 target is
 why S10 decimates with fast-simplification (S10 params v2).
 

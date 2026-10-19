@@ -1,227 +1,219 @@
-# Deploying Vesalius (free)
+# Deploying Vesalius
 
-A public showcase plus one admin login that unlocks uploads, pipeline runs and proofs. Nothing
-below needs a credit card (checked October 2026):
+Two parts, both without a credit card (checked October 2026):
 
-- an arm64 VM on **Azure for Students**: $100 of credit a year, no card, renewable while you are a
-  student. When the credit runs out Azure disables the subscription; it never bills you.
-  (With a card, Oracle's Always Free A1 runs the same stack at no cost at all: see the end.)
-- a **DuckDNS** name, with **Caddy** for HTTPS
-- **GitHub Actions** for CI and for building the arm64 image, with **ghcr.io** to hold it
-- **UptimeRobot** for alerts
+- **A. The static site on GitHub Pages: free, always on, no server.**
+  - It holds the landing page, the app and the full-body atlas.
+  - It also holds the three public CT studies, exported from the pipeline's gold output, and the
+    recorded proof results.
+  - It keeps working forever, whatever happens to part B.
+- **B. The live pipeline on Azure for Students: optional, woken on demand.**
+  - Runs, proofs and the AI happen here. The VM is off until a visitor presses **Wake the live
+    pipeline**; it starts in about 2 to 3 minutes and deallocates itself when nobody uses it.
+  - Credit is spent only while it runs. When the yearly $100 is used up, Azure disables the
+    subscription instead of billing you, and part A carries on.
 
 ```
-internet ──443──> Caddy ──> api:8000        https://<name>.duckdns.org        landing, /app, /studies, /docs
-                        └─> minio:9000      https://files.<name>.duckdns.org  GET/HEAD /gold/* only
-                 (postgres, minio, api: no host ports)
-
-GitHub (public repo) ── CI on ubuntu-24.04-arm ──> ghcr.io/<you>/vesalius-api ──pull──> the VM
+GitHub Pages (free, always on)                       Azure for Students ($100/yr, spent only when used)
+<you>.github.io/Vesalius/                            ┌ wake function (Flex Consumption, free grant)
+  landing · app/ (static mode) · app/atlas/          │   GET /api/status · POST /api/wake (daily cap)
+  app/data/ (studies, proofs, from gold)             │
+  "Wake the live pipeline" ──────────────────────────┘── starts ──> VM, Arm64 B4ps_v2 (normally off)
+     └─ when ready: opens https://<name>.duckdns.org/app/...        Caddy + api + Postgres + MinIO
+                                                                    autostop.sh: idle → deallocate
 ```
 
-Locally nothing changes: `Start Demo.bat` still runs everything on `127.0.0.1` with no login.
+**Why this shape:** research into free hosting, October 2026 (the report "Free hosting for Phantom", written before the product was renamed Vesalius).
+- Oracle's Always Free A1 is the only always-free machine big enough for a segmentation, but its
+  signup needs a card; it is the alternative at the end.
+- Free container platforms stop at 1 GB of RAM; Hugging Face Docker Spaces need a paid plan.
+- An always-on Azure VM would spend the $100 in about four months. Off by default, it lasts the year.
 
-**Why this stack:** research into free hosting, October 2026 (the report "Free hosting for Phantom", written before the product was renamed Vesalius).
-- Oracle's A1 is the only always-free machine that can run a segmentation, but its signup needs a
-  card.
-- Free container platforms stop at 1 GB of RAM; Hugging Face Docker Spaces now need a paid plan.
-- Azure for Students needs only a school email. Its free B1s VM (1 GB, x64) is too small, so the
-  VM spends credit, and Azure bills by the hour: segment on a big size for an hour, then serve on
-  a small one.
+## What visitors can do
 
-## What public mode does
+| Where | What |
+|---|---|
+| Static site | Explore the three studies and the full body (mouse or hands), see the audit trail of every study, read the recorded proof results |
+| Live pipeline, once woken | Run the built-in sample scans (synthetic or public test files, never a patient: 6 an hour each, `VESALIUS_RUN_DAILY_CAP` 60 a day for the site), run the proofs (3 an hour), ask the AI (10 an hour, `VESALIUS_AI_DAILY_CAP` 300 a day) |
+| Admin only (`/app/login`) | Upload a scan, `/ingest`: so nobody can send it a real patient scan (CLAUDE.md hard rule 1) |
 
-`VESALIUS_PUBLIC=1` (set by `docker-compose.prod.yml`):
+The static site sends nothing to anyone. Its one request anywhere other than its own files is the
+wake call, which carries no data (`viewer/src/lib/wake.ts`, guarded in `test_viewer_serving.py`).
 
-- **Visitors can look:** landing, app, studies, hologram, full-body atlas, lineage, reports, proof
-  verdicts, API docs, gold downloads.
-- **Visitors can ask the AI**, within limits:
-  - 10 explanations an hour per visitor
-  - 300 a day for the whole site (`VESALIUS_AI_DAILY_CAP`), so the free Groq quota can't be drained
-  - Snapshots are sent only for the atlas, never for a patient study (CLAUDE.md hard rule 8).
-- **Only the admin can act:** `POST /demo/runs/*`, `POST /demo/proofs/*` and `/ingest` return 401
-  to everyone else.
-  - A unit test walks the real route table and fails if a new mutating route has neither the admin
-    guard nor, for the two AI routes, the rate limit.
-  - Public uploads are off because this project must never receive real patient data (hard rule 1).
-- **Admin login:** at `/app/login` (the lock icon in the top bar).
-  - One password, stored only as a scrypt hash in `.env`.
-  - The session cookie is signed, HttpOnly, Secure, SameSite=Strict, and lasts 12 hours.
-  - After 5 wrong passwords from one IP, that IP is refused for 10 minutes.
-- **Downloads:** presigned links are signed for `https://files.<domain>`, and Caddy lets through only
-  reads of the gold bucket. Bronze, silver, quarantine and the MinIO console are unreachable.
+## A · The static site (GitHub Pages)
 
-## 1 · Accounts (you)
+`.github/workflows/pages.yml` builds and deploys it.
 
-1. **GitHub.** Create a **public** repository and push this branch to it as `main`. CI
-   (`.github/workflows/ci.yml`) then builds the arm64 api image and publishes it as
-   `ghcr.io/<you>/vesalius-api`.
-   - After the first green run, open the package on GitHub (your profile → Packages →
-     `vesalius-api` → Package settings) and set its visibility to **Public**. ghcr.io packages
-     start private even for public repositories, and the server pulls without a login.
-2. **Azure for Students.** Activate it at <https://azure.microsoft.com/free/students> with your
-   school email. No card.
-   - Never upgrade the subscription to Pay As You Go: then nothing can ever be billed, and when the
-     $100 is spent the VM simply stops.
-3. **DuckDNS.** Log in at <https://www.duckdns.org>, create a subdomain (e.g. `vesalius-yourname`),
-   and copy the **token**.
-4. **Groq (optional).** A free API key from <https://console.groq.com> for the AI explanations.
-   You put it in `.env` on the server yourself (step 4).
+1. **Turn Pages on:** repository → Settings → Pages → Source: **GitHub Actions**.
+2. **Build the data once:** Actions → **pages** → Run workflow, tick **rebuild the exported
+   studies** (about an hour). The `data` job:
+   - runs the pipeline on the three public CTs
+   - runs every proof (proof 5, "a head study in the viewer has no face", must pass)
+   - exports the gold with `scripts/export_static.py`, which reads only the gold serving routes
+     and refuses an undefaced head, a mesh matching no gold record, or a study without a public
+     source to credit
+   - publishes it as the asset of the `static-data` release. Scan data is never committed.
+3. **After that, every push to `main` redeploys the site** around the latest data, in a few
+   minutes. Rebuild the data only when the pipeline changes.
 
-## 2 · The VM (you, in the Azure portal)
+The site is then at `https://<you>.github.io/Vesalius/`.
 
-The sizes are **Arm64** (the `p` in the name), so they run the image CI builds. Prices are
-Central India list prices as tracked in October 2026; the portal shows the current ones before you
-create.
+**Rehearse locally** (the same layout):
+```bash
+cd viewer && VITE_BASE=/Vesalius/app/ npm run build -- --mode pages && cd ..
+python scripts/export_static.py --api http://127.0.0.1:<port> --out site-data   # needs proof 5 passed
+bash scripts/build_pages_site.sh site site-data
+```
 
-| Size | vCPU / RAM | ≈ per hour | Use |
-|---|---|---|---|
-| `Standard_B4ps_v2` | 4 / 16 GB | $0.09 | the first deploy: loading the studies segments them (~8 GB peak) |
-| `Standard_B2pls_v2` | 2 / 4 GB | $0.022 (≈ $16 a month) | serving: the whole stack idles at ~0.6 GB |
+## B · The live pipeline (Azure for Students)
 
-Plus about $9 a month for the disk and the static IP. Serving all month costs about $25, so the
-$100 lasts about 4 months; **Stop** the VM when nobody is looking and it lasts much longer.
+Without part B the site works fully; the "Wake" buttons just say the live pipeline isn't offered.
 
-1. Virtual machines → Create → Azure virtual machine:
-   - **Region:** Central India, or the nearest the portal offers. Student subscriptions allow only
-     some regions and sizes; if a size is unavailable, try another region.
-   - **Image:** Ubuntu Server 24.04 LTS, **Arm64**.
-   - **Size:** `Standard_B4ps_v2` for now (resized down in §4).
-   - **Authentication:** SSH public key, username `azureuser`.
-   - **Inbound ports:** SSH (22), HTTP (80), HTTPS (443).
-   - **Disks:** OS disk 64 GB, Standard SSD.
-   - **Networking:** a new public IP (Standard SKU, which is static).
-   - **Management:** auto-shutdown **off** (it would take the site down every night).
-2. Cost Management → Budgets: a budget of $100 with alerts at 50 % and 80 %, to your email.
-3. Point the DuckDNS subdomain at the VM's public IP. `setup-server.sh` keeps it updated.
+### 1. Accounts (you)
+- **Azure for Students:** activate at <https://azure.microsoft.com/free/students> with your
+  school email. No card. Never upgrade the subscription to Pay As You Go, so nothing can be
+  billed.
+- **DuckDNS:** log in at <https://www.duckdns.org>, create a subdomain (e.g. `vesalius-yourname`),
+  and copy the **token**.
 
-## 3 · Install (on the VM)
+### 2. Provision (you, in Azure Cloud Shell)
+Open the portal → the `>_` icon (Cloud Shell, Bash). It is already signed in, so no credential
+leaves Azure.
 
 ```bash
-ssh azureuser@<vm-ip>
-git clone https://github.com/amaltomajith/Vesalius.git ~/vesalius   # public: no key needed
-cd ~/vesalius
-sudo bash scripts/deploy/setup-server.sh vesalius-yourname.duckdns.org <duckdns-token>
+git clone https://github.com/amaltomajith/Vesalius.git && cd Vesalius
+bash deploy/azure/provision.sh vesalius-yourname centralindia
+```
+
+`provision.sh` (idempotent) creates the VM, a custom role and the wake function:
+- **The VM:** Ubuntu 24.04 **Arm64** `Standard_B4ps_v2` (4 vCPU / 16 GB, a segmentation fits), a
+  32 GB Standard SSD, a static IP, inbound 22/80/443 only, and a managed identity.
+- **The role "Vesalius VM power":** read, start and deallocate, assigned on that VM only, to the
+  VM itself (to put itself to sleep) and to the wake function (to start it).
+- **The wake function** (`deploy/azure/wake`): Flex Consumption, callable only from the site
+  (CORS), at most 6 wakes a day.
+
+It prints the IP and the two repository variables. If Azure refuses something:
+- **A size or region refused** (student subscriptions allow only some): rerun with
+  `VM_SIZE=...` or another region.
+- **Flex Consumption missing in your region:** see `az functionapp list-flexconsumption-locations`
+  and rerun with `WAKE_LOCATION=<region>`.
+
+Then **Cost Management → Budgets → Add:** $100, with email alerts at 50 % and 80 %.
+
+### 3. The server (you, over SSH from Cloud Shell)
+Point the DuckDNS subdomain at the printed IP, then:
+
+```bash
+ssh azureuser@<ip>
+git clone https://github.com/amaltomajith/Vesalius.git ~/vesalius && cd ~/vesalius
+sudo bash scripts/deploy/setup-server.sh vesalius-yourname.duckdns.org <duckdns-token> --autostop
 exit   # log in again so the docker group applies
 ```
 
-`setup-server.sh` (idempotent: safe to run again):
+`setup-server.sh` (idempotent):
 - installs Docker
-- opens 80/443 in the host firewall where the image has one (Oracle's); on Azure the network
-  security group from §2 is the firewall
 - adds 4 GB of swap
 - installs the DuckDNS updater
 - turns on automatic security updates
-- writes `.env`:
-  - random database, MinIO and de-identification secrets
-  - the domain and a session secret
-  - `VESALIUS_IMAGE`, read from the git remote
+- writes `.env`: random secrets, the domain, the CI image name
+- `--autostop`: installs the timer that runs `scripts/deploy/autostop.sh` every minute
 
-## 4 · Deploy
-
-Optional, the AI: `nano ~/vesalius/.env` and set `GROQ_API_KEY=` to your key. You type it; nothing
-else ever writes it.
+Optional, the AI: `nano ~/vesalius/.env` and set `GROQ_API_KEY=` to your key. You type it;
+nothing else ever writes it. Then:
 
 ```bash
-cd ~/vesalius
-bash scripts/deploy/deploy.sh --studies
+cd ~/vesalius && bash scripts/deploy/deploy.sh --studies
 ```
 
 The first run:
-- **Asks for the admin password** (12+ characters). Only its hash goes into `.env`.
-- **Pulls the arm64 image** CI built (`docker pull`, a few minutes). `--build` builds it here
-  instead, if CI is ever unavailable (slow on 2 cores).
-- **Builds the MinIO image once**, from MinIO's final upstream release (`docker/minio/Dockerfile`):
-  MinIO no longer publishes images. A few minutes; CI proves the same build on arm64.
-- **Starts the stack and loads the three public CT studies** (head, chest, abdomen). That downloads
-  the scans and the segmentation model and segments one study at a time.
-  - It is unmeasured on 4 Azure Arm64 cores: allow an hour, and write the real time here after the
-    first run.
+- **Asks for the admin password** (12+ characters); only its hash goes into `.env`.
+- **Pulls the arm64 api image** CI built (`ghcr.io/<you>/vesalius-api`).
+- **Builds the MinIO image once**, from MinIO's final upstream release (`docker/minio`): MinIO no
+  longer publishes images.
+- **Loads the three public CT studies**, segmenting one at a time. Unmeasured on this VM: allow an
+  hour, and write the real time here.
 
-**Then resize down** (Azure): once the studies are loaded, VM → Size → `Standard_B2pls_v2`. The
-VM restarts and the stack comes back by itself (Docker starts at boot, the services restart).
-Before an admin "Run a scan" or proof, resize back up to `Standard_B4ps_v2`: a segmentation does
-not fit in 4 GB.
+Keep the session alive while it loads: autostop only stops an idle VM, and the load counts as busy.
 
-Later updates: push to `main`, wait for CI to go green, then `bash scripts/deploy/deploy.sh`. It
-pulls the code and the new image and restarts.
+### 4. Connect the site (you, on GitHub)
+Repository → Settings → Secrets and variables → Actions → **Variables**: add `WAKE_URL` and
+`BACKEND_URL` as printed by `provision.sh`. Re-run the **pages** workflow (no data rebuild
+needed). The site's Wake buttons now work.
 
-**Uptime:** add two free UptimeRobot HTTP monitors, `https://<domain>/health` and
-`https://<domain>/`, with alerts to your email.
+### How it sleeps and wakes
+- **Waking:** the site posts to the wake function, which starts the VM if it is deallocated and
+  today's wakes are under the cap. Docker brings the stack up at boot, and the site polls until
+  `/health/ready` answers (database and object store), then opens the same screen on the backend.
+- **Sleeping:** `autostop.sh` asks the api's `/health/idle` every minute (health checks don't
+  count as use). It deallocates the VM through its managed identity when it is idle for 15
+  minutes, or has been up 60, never mid-scan or mid-proof before the 3-hour hard limit. Tune it
+  with `VESALIUS_IDLE_MINUTES`, `VESALIUS_SESSION_MINUTES` and `VESALIUS_HARD_MINUTES` in `.env`.
+- **The address stays the same:** the static IP keeps DuckDNS and Caddy's certificates valid
+  across restarts.
 
-## 5 · Check it
+### Costs (Central India list prices, October 2026; the portal shows today's)
+| | |
+|---|---|
+| Asleep | static IP ≈ $3.65 + 32 GB disk ≈ $2.40 + function storage ≈ $0.10 → **≈ $6 a month** |
+| Awake | B4ps_v2 ≈ **$0.09 an hour**: a 20-minute visit ≈ $0.03 |
+| Worst case | 6 wakes a day × at most 60 minutes ≈ $16 a month on top |
 
-From your own machine:
+With light traffic, about $7 to $8 a month: the $100 lasts about a year, and it renews each school
+year. When it runs out the subscription is disabled, not billed; the static site is unaffected.
 
+### Check it
 ```bash
 D=vesalius-yourname.duckdns.org
-curl -sI https://$D/ | head -1                               # 200
 curl -s  https://$D/auth/me                                  # {"public":true,"admin":false}
-curl -s -o /dev/null -w '%{http_code}\n' -X POST https://$D/demo/proofs/face   # 401
+curl -s -o /dev/null -w '%{http_code}\n' -X POST https://$D/demo/runs/upload   # 401
 curl -s -o /dev/null -w '%{http_code}\n' https://files.$D/bronze/x             # 404
 curl -s -o /dev/null -w '%{http_code}\n' https://files.$D/silver/x             # 404
-nmap -Pn -p 1-10000 $D                                       # only 22, 80, 443 open
 ```
+Then from the static site, wake it, run a sample scan, run a proof, ask the AI. Leave it 15
+minutes and check that the VM is **Stopped (deallocated)** in the portal. Note the cold-start time
+here.
 
-Then in a browser:
-- open `/app`, a study, the hologram (the camera prompt appears because it's HTTPS) and the full body
-- ask the AI about a structure
-- sign in at `/app/login` and run proof 5 ("the 3D viewer never shows a face")
+## Public mode on the backend
 
-## If the VM is lost (reclaimed, deleted, or no longer reachable)
+`VESALIUS_PUBLIC=1` (set by `docker-compose.prod.yml`):
+- **Visitors:** everything to look at, plus the rate-limited actions in the table above.
+- **The admin:** one password, stored only as a scrypt hash in `.env`. The session cookie is
+  signed, HttpOnly, Secure, SameSite=Strict, and lasts 12 hours. After 5 wrong passwords from one
+  IP, that IP is refused for 10 minutes.
+- **A unit test walks the real route table** and fails if a route that changes anything has
+  neither the admin guard nor its own rate limit, or if uploads stop being admin-only.
+- **Downloads:** presigned links are signed for `https://files.<domain>`, and Caddy lets through
+  only reads of the gold bucket. Bronze, silver, quarantine and the MinIO console are unreachable.
 
-There is nothing to back up.
-- **Every scan is public and re-created exactly.** `deploy.sh --studies` rebuilds the same gold,
-  and the reproducibility proof guarantees byte-identical output.
-- **The only state is `.env`:** keep a private copy of it (secrets, admin hash, Groq key). A lost
-  `.env` only means new secrets and a new admin password.
+## If the VM is lost
 
-To rebuild:
-1. create a new VM (§2)
-2. run setup-server (§3)
-3. copy your saved `.env` back (or let setup-server make a new one)
-4. run `deploy.sh --studies`
-
-About half an hour of your time, plus the study load.
-
-`scripts/deploy/backup.sh` still exists if you want nightly dumps on the VM, but they live on the
-same machine, so they don't survive losing it.
-
-## Limits worth knowing
-
-- **The credit is the clock (Azure).** About 4 months of always-on serving per $100.
-  - Check what is left in the portal's Education hub, and keep the budget alerts.
-  - Stop (deallocate) the VM between showings: a stopped VM costs only its disk and IP.
-  - When the credit is spent the subscription is disabled, not billed; it renews next school year.
-- **One heavy job at a time.**
-  - A segmentation, proof or run holds a lock while the others wait (`api/demo_state.HEAVY_LOCK`).
-  - Memory limits: api 8 GB, Postgres 1 GB, MinIO 1 GB, Caddy 256 MB, plus 4 GB of swap. On the
-    4 GB serving size these are ceilings, not reservations: idle, the stack uses ~0.6 GB.
-- **arm64.**
-  - The image is built natively on GitHub's arm64 runner and smoke-tested there: every heavy import
-    plus the unit suite, before it is pushed.
-  - PyTorch comes from its CPU index; `torch 2.14.0+cpu` has an aarch64 wheel.
-  - S10 decimates with fast-simplification, because pymeshlab had no arm64 build.
-- **One admin, no user accounts.** Out of scope by design.
-- **Never upload real patient scans**, not even as the admin (CLAUDE.md hard rule 1).
-- **Free services change.** This file reflects October 2026 (Oracle halved A1 in June 2026 with no
-  announcement). Recheck the limits before relying on them.
+There is nothing to back up. Every scan is public and re-created exactly: `deploy.sh --studies`
+rebuilds the same gold, and the reproducibility proof guarantees byte-identical output. The only
+state is `.env`; keep a private copy of it. To rebuild, rerun §2 to §4.
 
 ## Alternative: Oracle Cloud Always Free (needs a card)
 
-The same stack at no cost at all, if you can pass Oracle's card check (a temporary verification
-hold; Always Free resources are never charged unless the account is upgraded).
+The backend at no cost at all and always on, if you can pass Oracle's card check (a temporary
+verification hold; Always Free resources are never charged unless the account is upgraded):
+1. **Sign up** at <https://signup.cloud.oracle.com>. Pick a home region with Ampere A1 capacity;
+   it can't be changed. Never upgrade to Pay As You Go.
+2. **Create the instance:** Compute → Instances → Create, Ubuntu 24.04, `VM.Standard.A1.Flex` at
+   **2 OCPU / 12 GB**, no more (since 15 June 2026 that is the whole free allowance). Boot volume
+   100 GB.
+3. **Open the ports:** in the VCN security list, add ingress TCP 80 and 443.
+4. **Install:** §3 above as `ubuntu`, without `--autostop`. Then set only `BACKEND_URL`, not
+   `WAKE_URL`, and the site links straight to it.
 
-1. Sign up at <https://signup.cloud.oracle.com>. Pick a **home region** with Ampere A1 capacity:
-   it can't be changed later, and all free compute lives there. Never upgrade to Pay As You Go.
-2. Compute → Instances → Create:
-   - **Image:** Ubuntu 24.04. **Shape:** Ampere `VM.Standard.A1.Flex`, **2 OCPU / 12 GB**, not
-     more: since 15 June 2026 that is the whole free allowance (it was 4 / 24), and if the
-     account's A1 usage is above it when the trial ends, Oracle deletes the A1 instances.
-   - **Boot volume:** 100 GB (the free allowance is 200 GB in total). **SSH key:** yours.
-   - "Out of host capacity" is common: retry in another availability domain, or later.
-3. Networking → the VCN → Security List: ingress **TCP 80 and 443** from `0.0.0.0/0`.
-4. §3 and §4 as above, logging in as `ubuntu`. No resizing: 12 GB holds a segmentation.
+Oracle may reclaim an idle Always Free instance (CPU, network and memory under 20 % for 7 days);
+rebuilding is the defence.
 
-**Idle reclamation:** Oracle may reclaim an Always Free instance when its CPU (95th percentile),
-network and memory all stay under 20% for 7 days. A quiet showcase can meet that, and uptime pings
-don't prevent it; the defences are the rebuild path above and the UptimeRobot alert.
+## Limits worth knowing
+- **One heavy job at a time.** A segmentation, proof or run holds a lock while others wait
+  (`api/demo_state.HEAVY_LOCK`).
+- **The live pipeline's in-memory state resets on every wake.** That covers runs in progress, the
+  last proof results and rate-limit counters. The static site keeps its own recorded proofs.
+- **arm64.** CI builds and smoke-tests the api image and the MinIO image on GitHub's native arm64
+  runner. S10 decimates with fast-simplification because pymeshlab has no arm64 build.
+- **Never upload real patient scans,** not even as the admin (CLAUDE.md hard rule 1).
+- **Free services change.** This file reflects October 2026; recheck limits before relying on them.

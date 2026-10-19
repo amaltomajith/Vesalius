@@ -8,6 +8,9 @@
 #   - the VM has been up VESALIUS_SESSION_MINUTES (default 60), or
 #   - it has been up VESALIUS_HARD_MINUTES (default 180), even mid-job (a job that hangs).
 # A scan or a proof in progress (the api's HEAVY_LOCK) is never cut short before the hard limit.
+# Nor is maintenance: while <repo>/.autostop-hold exists (deploy.sh and setup-server.sh create it;
+# `touch` it by hand to work on the server) the VM is kept, until the hold is older than the
+# hard limit, so a forgotten hold cannot keep it running for ever.
 #
 # The VM deallocates itself through its managed identity (deploy/azure/provision.sh grants it
 # exactly that), so no credential is stored on it.
@@ -51,7 +54,13 @@ deallocate() {
 }
 
 main() {
-  local up idle busy json decision
+  local up idle busy json decision repo hold
+  repo="$(cd "$(dirname "$0")/../.." && pwd)"
+  hold="${VESALIUS_AUTOSTOP_HOLD:-$repo/.autostop-hold}"
+  if [[ -f $hold ]] && (( $(date +%s) - $(stat -c %Y "$hold") < HARD )); then
+    echo "autostop: keep: held by $hold"
+    return
+  fi
   up="${AUTOSTOP_UPTIME:-$(cut -d. -f1 /proc/uptime)}"  # the override is for tests
   json="$(api_idle)"
   if [[ -n $json ]]; then

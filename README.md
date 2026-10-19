@@ -152,8 +152,8 @@ npm test         # vitest: mesh-contract validation (studies, atlas, surfaces), 
 npm run build    # the Docker image does this in its Node stage and serves it at /app/
 ```
 
-`python scripts/bundle_viewer_demo.py --api http://localhost:<port>` bundles a served chest study
-into the viewer as its offline demo (gitignored).
+`npm run build -- --mode pages` builds the static site's app (no server; DEPLOY.md part A). Its
+data comes from `python scripts/export_static.py --api http://localhost:<port>` (gitignored).
 
 ### Tests
 

@@ -8,6 +8,9 @@
 # First run: asks for the admin password once and stores only its scrypt hash in .env.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+# the on-demand backend must not put itself to sleep mid-deploy (scripts/deploy/autostop.sh)
+touch .autostop-hold
+trap 'rm -f .autostop-hold' EXIT
 COMPOSE=(docker compose -f docker-compose.yml -f docker-compose.prod.yml)
 env_value() { sed -n "s/^$1=//p" .env | head -n1; }
 
