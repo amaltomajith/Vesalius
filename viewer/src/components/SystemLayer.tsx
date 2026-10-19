@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useGLTF } from '@react-three/drei';
+import { DRACO_DECODER } from '../lib/runtime';
 import * as THREE from 'three';
 
 interface SystemLayerProps {
@@ -42,7 +43,7 @@ function inHidden(obj: THREE.Object3D, root: THREE.Object3D, hidden: ReadonlySet
 export default function SystemLayer({ url, color, emissive, visible, onLoaded, hidden = NONE }: SystemLayerProps) {
   // Draco/meshopt off: pipeline GLBs are uncompressed (Draco deferred), and drei's default
   // Draco decoder would come from a CDN.
-  const { scene } = useGLTF(url, false, false);
+  const { scene } = useGLTF(url, DRACO_DECODER, false);
 
   // Stable clone — created once per scene identity, never replaced.
   const cloneRef = useRef<THREE.Group | null>(null);

@@ -1,10 +1,11 @@
 import { Suspense, useEffect, useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Bounds, Center, OrbitControls, useGLTF } from '@react-three/drei';
+import { DRACO_DECODER } from '../lib/runtime';
 import * as THREE from 'three';
 
 function Model({ url }: { url: string }) {
-  const { scene } = useGLTF(url, false, false);
+  const { scene } = useGLTF(url, DRACO_DECODER, false);
   // a private copy with its own materials (VIEWER-CONSTRAINTS: never mutate the cached scene)
   const clone = useMemo(() => {
     const c = scene.clone(true);

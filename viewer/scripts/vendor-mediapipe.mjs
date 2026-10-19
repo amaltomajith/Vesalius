@@ -30,3 +30,11 @@ if (!existsSync(modelPath) || sha(readFileSync(modelPath)) !== MODEL_SHA256) {
   writeFileSync(modelPath, buf);
 }
 console.log('mediapipe vendored into public/mediapipe');
+
+// three.js's Draco decoder (Apache-2.0, the version package-lock pins): the static site's atlas is
+// Draco-compressed (scripts/compress_atlas.py), and the decoder must load from the site, not a CDN
+cpSync(join(root, 'node_modules', 'three', 'examples', 'jsm', 'libs', 'draco', 'gltf'), join(root, 'public', 'draco'), {
+  recursive: true,
+  filter: (src) => !src.endsWith('draco_encoder.js'), // the app only decodes
+});
+console.log('draco decoder vendored into public/draco');

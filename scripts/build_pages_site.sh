@@ -5,7 +5,7 @@
 #   <out>/index.html        the landing page (data-static: hides what needs the API)
 #   <out>/static/           its assets (src/api/static)
 #   <out>/app/              the app, built with `vite build --mode pages` (viewer/dist)
-#   <out>/app/atlas/        the full-body atlas (assets/atlas)
+#   <out>/app/atlas/        the full-body atlas, Draco-compressed (scripts/compress_atlas.py)
 #   <out>/app/data/, <out>/demo/proofs/last   the exported studies and proofs (export_static.py)
 #   <out>/app/config.json   {wakeUrl, backendUrl} from WAKE_URL / BACKEND_URL (empty: no live backend)
 #   <out>/404.html          the app again, so deep links (/app/hologram/...) survive a refresh
@@ -28,7 +28,9 @@ cp -r "$REPO/src/api/static/." "$OUT/static/"
 sed 's/<html lang="en">/<html lang="en" data-static>/' "$REPO/src/api/static/landing.html" > "$OUT/index.html"
 grep -q 'data-static' "$OUT/index.html" || { echo "landing.html: no <html lang=\"en\"> to mark" >&2; exit 1; }
 cp -r "$REPO/viewer/dist/." "$OUT/app/"
-cp -r "$REPO/assets/atlas" "$OUT/app/atlas"
+# Draco-compressed (Pages serves GLBs uncompressed: 77 MB -> 15 MB for the default view), the scene
+# graph checked unchanged file by file; needs node (npx) and python3
+python3 "$REPO/scripts/compress_atlas.py" "$REPO/assets/atlas" "$OUT/app/atlas"
 cp "$OUT/app/index.html" "$OUT/404.html"
 
 if [ -n "$DATA" ]; then

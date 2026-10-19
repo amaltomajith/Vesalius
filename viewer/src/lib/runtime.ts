@@ -7,6 +7,9 @@
 
 export const STATIC = import.meta.env.VITE_STATIC === '1';
 export const BASE = import.meta.env.BASE_URL; // "/app/" served, "/Vesalius/app/" on Pages
+/** three.js's Draco decoder, vendored at build time (scripts/vendor-mediapipe.mjs). Only fetched
+ *  for a Draco-compressed GLB: the static site's atlas (scripts/compress_atlas.py). */
+export const DRACO_DECODER = `${BASE}draco/`;
 
 /** React Router's basename: the base without its trailing slash ("/app", "/Vesalius/app"). */
 export const basename = (base: string = BASE): string => base.replace(/\/+$/, '') || '/';

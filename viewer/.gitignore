@@ -25,3 +25,4 @@ dist-ssr
 
 # vendored at build time from pinned sources (scripts/vendor-mediapipe.mjs)
 public/mediapipe
+public/draco
