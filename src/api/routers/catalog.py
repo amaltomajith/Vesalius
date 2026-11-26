@@ -10,6 +10,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from api.dependencies import serving_session_dependency, settings_dependency
@@ -140,3 +141,52 @@ def get_contract(name: str, version: str, session: ServingSession) -> ContractRe
     if contract is None:
         raise HTTPException(status_code=404, detail="contract not found")
     return contract
+
+
+# ---- studies: the viewer's view of structures-mode output (refs/INTEGRATION.md §6) ---------------
+# Same trust boundary as everything above: serving_ro session, gold only, and objects are handed
+# out as short-lived presigned redirects ("presigned redirect, gold only" -- refs §6), never
+# streamed from the object store by this router.
+
+
+@router.get("/studies")
+def list_studies(session: ServingSession) -> dict[str, object]:
+    return {
+        "contract_version": _contract_version(session),
+        "mesh_contract_version": "1.0",
+        "studies": queries.structure_studies(session),
+    }
+
+
+def _redirect(settings: Settings, object_key: str | None, what: str) -> RedirectResponse:
+    if object_key is None:
+        # missing and non-gold are indistinguishable on purpose
+        raise HTTPException(status_code=404, detail=f"{what} not found")
+    url, _ttl = presign_gold_url(settings, object_key)
+    return RedirectResponse(url, status_code=307)
+
+
+@router.get("/studies/{series_id}/structures")
+def get_study_structures(
+    series_id: UUID,
+    session: ServingSession,
+    settings: Annotated[Settings, Depends(settings_dependency)],
+) -> RedirectResponse:
+    return _redirect(
+        settings, queries.structures_manifest_key(session, series_id), "structures manifest"
+    )
+
+
+@router.get("/studies/{series_id}/mesh/{group}.glb")
+def get_study_mesh(
+    series_id: UUID,
+    group: str,
+    session: ServingSession,
+    settings: Annotated[Settings, Depends(settings_dependency)],
+) -> RedirectResponse:
+    return _redirect(settings, queries.mesh_group_key(session, series_id, group), "mesh group")
+
+
+@router.get("/studies/{series_id}/lineage", response_model=LineageResponse)
+def get_study_lineage(series_id: UUID, session: ServingSession) -> LineageResponse:
+    return get_lineage(series_id, session)

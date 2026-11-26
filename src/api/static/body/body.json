@@ -1,0 +1,210 @@
+{
+  "alignment": {
+    "atlas_cranium": {
+      "breadth": 0.144612,
+      "vertex_y": 1.705363
+    },
+    "band_below_vertex_m": [
+      0.03,
+      0.1
+    ],
+    "ct_cranium": {
+      "breadth": 0.146066,
+      "vertex_y": 0.077036
+    },
+    "scale": 1.01006
+  },
+  "anchors": [
+    {
+      "at": [
+        0.0374,
+        0.0187,
+        0.025
+      ],
+      "label": "Skull",
+      "system": "skeleton"
+    },
+    {
+      "at": [
+        0.2013,
+        -0.3871,
+        0.0218
+      ],
+      "label": "Humerus",
+      "system": "skeleton"
+    },
+    {
+      "at": [
+        -0.067,
+        -0.7317,
+        0.0096
+      ],
+      "label": "Pelvis",
+      "system": "skeleton"
+    },
+    {
+      "at": [
+        -0.0885,
+        -0.9818,
+        0.0146
+      ],
+      "label": "Femur",
+      "system": "skeleton"
+    },
+    {
+      "at": [
+        0.08,
+        -1.3887,
+        0.0233
+      ],
+      "label": "Tibia",
+      "system": "skeleton"
+    },
+    {
+      "at": [
+        -0.0204,
+        -0.3417,
+        -0.0308
+      ],
+      "label": "Heart",
+      "system": "vessels"
+    },
+    {
+      "at": [
+        -0.0128,
+        -0.3473,
+        0.0196
+      ],
+      "label": "Aorta",
+      "system": "vessels"
+    },
+    {
+      "at": [
+        0.0702,
+        -0.3327,
+        -0.0157
+      ],
+      "label": "Lungs",
+      "system": "organs"
+    },
+    {
+      "at": [
+        0.0143,
+        -0.4591,
+        -0.029
+      ],
+      "label": "Liver",
+      "system": "organs"
+    },
+    {
+      "at": [
+        -0.0361,
+        -0.4673,
+        -0.0425
+      ],
+      "label": "Stomach",
+      "system": "organs"
+    },
+    {
+      "at": [
+        -0.0033,
+        -0.5334,
+        -0.05
+      ],
+      "label": "Colon",
+      "system": "organs"
+    }
+  ],
+  "bounds_m": [
+    [
+      -0.3376,
+      -1.6421,
+      -0.1443
+    ],
+    [
+      0.3428,
+      0.0788,
+      0.1148
+    ]
+  ],
+  "bytes": 2969958,
+  "excluded": "nervous system; kidney/renal/ear nodes; visceral nodes other than named organs",
+  "extent_m": 1.6421159164049774,
+  "frame": "the head CT cloud's (scan/head_points.json): glTF metres, Y up, anterior -Z",
+  "layout": "per system, at its offsets: int16 xyz[vertices] (x extent_m / 32767) | int8 normal xyz[vertices] (/ 127) | uint16 index[triangles * 3]",
+  "licence": "CC-BY-SA 4.0 (derived from Z-Anatomy / BodyParts3D); see CREDITS.txt",
+  "systems": [
+    {
+      "faces_source": 680287,
+      "file": "skeletal.glb",
+      "idx_offset": 1314054,
+      "name": "skeleton",
+      "nodes": 271,
+      "nrm_offset": 876036,
+      "pos_offset": 0,
+      "sha256": "6fe2aace6bf42457ab94aa55f7e0cc2bae410d876c4f4167d69349160bc938ec",
+      "skipped": {
+        "licence": 7,
+        "not_an_organ": 0,
+        "outside_body": 0,
+        "overlay": 1631
+      },
+      "triangles": 99985,
+      "vertices": 50471
+    },
+    {
+      "faces_source": 2294221,
+      "file": "muscular.glb",
+      "idx_offset": 1913964,
+      "name": "muscle",
+      "nodes": 681,
+      "nrm_offset": 1027449,
+      "pos_offset": 302826,
+      "sha256": "046aa292c4eb9441ca78049eaee1f8cfe6bbab555fa44a82f6cfbb6db1d4b985",
+      "skipped": {
+        "licence": 0,
+        "not_an_organ": 0,
+        "outside_body": 4,
+        "overlay": 0
+      },
+      "triangles": 100000,
+      "vertices": 53757
+    },
+    {
+      "faces_source": 1530685,
+      "file": "cardiovascular.glb",
+      "idx_offset": 2513964,
+      "name": "vessels",
+      "nodes": 660,
+      "nrm_offset": 1188720,
+      "pos_offset": 625368,
+      "sha256": "350e5dbf560bf241577b8928f093eef22c0284ee66cb72fdd5ccbb3005eaaf13",
+      "skipped": {
+        "licence": 8,
+        "not_an_organ": 0,
+        "outside_body": 0,
+        "overlay": 0
+      },
+      "triangles": 39999,
+      "vertices": 23638
+    },
+    {
+      "faces_source": 184918,
+      "file": "visceral.glb",
+      "idx_offset": 2753958,
+      "name": "organs",
+      "nodes": 17,
+      "nrm_offset": 1259634,
+      "pos_offset": 767196,
+      "sha256": "ad6d89dbf2fa29e024291e94631ab2e1aec2e82240fa807c0d5045d15717b063",
+      "skipped": {
+        "licence": 10,
+        "not_an_organ": 95,
+        "outside_body": 0,
+        "overlay": 162
+      },
+      "triangles": 36000,
+      "vertices": 18140
+    }
+  ]
+}

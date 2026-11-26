@@ -48,7 +48,39 @@ VOLUME_CONTRACT_V1_0: dict[str, Any] = {
     ],
 }
 
-PUBLISHED_CONTRACTS: tuple[dict[str, Any], ...] = (VOLUME_CONTRACT_V1_0,)
+MESH_CONTRACT_V1_0: dict[str, Any] = {
+    "name": "mesh_contract",
+    "version": "1.0",
+    "artifact_kind": "structures_manifest",
+    "format": "json",
+    "layout": {
+        "manifest": "gold/{series_id}/mesh/structures.json",
+        "groups": "gold/{series_id}/mesh/{group}.glb -- one GLB per body-system group",
+    },
+    "geometry": {
+        "export_frame": "glTF_Y_up_m",
+        "units": "metres",
+        "shared_origin": True,
+        "note": "every group of a study is written with one centring offset, so layers align",
+    },
+    "nodes": {
+        "naming": "exact segmentation label, lowercase, underscore-separated, unmodified",
+        "one_node_per_structure": True,
+    },
+    "per_structure": ["node", "label", "faces", "volume_ml", "hu_mean", "hu_std", "bbox_mm"],
+    "bbox_frame": "RAS_mm",
+    "deface": {
+        "fields": ["required", "applied", "method"],
+        "consumer_rule": "refuse the study when required and not applied",
+    },
+    "guarantees": [
+        "produced from the S7-gated (defaced when required) volume only",
+        "served from gold only",
+        "unmapped labels are listed under the group 'other', never dropped",
+    ],
+}
+
+PUBLISHED_CONTRACTS: tuple[dict[str, Any], ...] = (VOLUME_CONTRACT_V1_0, MESH_CONTRACT_V1_0)
 
 
 class ContractConflictError(PipelineError):

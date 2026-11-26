@@ -150,6 +150,10 @@ class GatedVolume:
     source: str
     _block: dict[str, Any]
     _seal: object = field(repr=False, compare=False, default=None)
+    # S7's removed region as recorded in its (hash-verified) report: the RAS thresholds
+    # {"a_min", "s_min"} of the face region, or None when the volume was not defaced.
+    # Structures mode cuts bone to this region too (user decision, 2026-09-27).
+    face_region: dict[str, float] | None = None
 
     def __post_init__(self) -> None:
         if self._seal is not _TOKEN:
@@ -260,6 +264,15 @@ def _read_verified(client: Minio, settings: Settings, fact: ArtifactFact, code: 
     return data
 
 
+def _face_region(facts: GateFacts, source: str) -> dict[str, float] | None:
+    if source != SOURCE_DEFACED or not facts.report_body:
+        return None
+    world = facts.report_body.get("region", {}).get("world_mm") or {}
+    if "a_min" not in world or "s_min" not in world:
+        return None
+    return {"a_min": float(world["a_min"]), "s_min": float(world["s_min"])}
+
+
 def open_defacing_gate(
     session: Session, silver_client: Minio, settings: Settings, series_id: UUID
 ) -> GatedVolume:
@@ -290,4 +303,5 @@ def open_defacing_gate(
         source=verdict.source,
         _block=verdict.deface_block,
         _seal=_TOKEN,
+        face_region=_face_region(facts, verdict.source),
     )

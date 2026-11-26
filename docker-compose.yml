@@ -17,7 +17,7 @@ services:
     # bound to 5432, and Docker's port-forward silently collides with it rather than
     # erroring -- connections to localhost:5432 were reaching the native service, not
     # this container. Inside the Docker network other services still use 5432.
-    ports: ["5433:5432"]
+    ports: ["127.0.0.1:5433:5432"]
 
   minio:
     image: quay.io/minio/minio
@@ -33,7 +33,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-    ports: ["9000:9000", "9001:9001"]
+    ports: ["127.0.0.1:9000:9000", "127.0.0.1:9001:9001"]
 
   minio-init:
     build: ./docker/minio-init
@@ -98,7 +98,24 @@ services:
       # Used by S4 for HMAC-keyed UID remap / date shift / patient pseudonym.
       DEID_UID_SECRET: ${DEID_UID_SECRET:-}
       DEID_DATE_SHIFT_SECRET: ${DEID_DATE_SHIFT_SECRET:-}
-    ports: ["8000:8000"]
+      # Presigned download URLs are signed for THIS host (the host is part of the signature);
+      # inside the compose network MinIO is `minio:9000`, which a browser cannot reach.
+      MINIO_PUBLIC_ENDPOINT: localhost:9000
+      # optional AI explanations in the app; empty = off (the key never reaches the browser)
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+    # 127.0.0.1 only: the demo page can start pipeline runs and the proof tests and has no login,
+    # so it must not be reachable from other machines. The host port is DEMO_PORT (chosen free by
+    # scripts/setup-demo.ps1 the first time, since 8000 is commonly taken by other software).
+    volumes:
+      - totalseg_weights:/weights   # S8 structure-mode model weights, downloaded once
+    ports: ["127.0.0.1:${DEMO_PORT:-8000}:8000"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
 
   # OCR-dependent tests (channel 3 / S4 redaction, S5 verification, the PHI injection proof)
   # need the real tesseract binary, which only exists inside this image -- see
@@ -146,3 +163,4 @@ secrets:
 volumes:
   postgres_data: {}
   minio_data: {}
+  totalseg_weights: {}

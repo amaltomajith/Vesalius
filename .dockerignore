@@ -1,0 +1,15 @@
+.venv/
+.git/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+sample_data/
+tests/proofs/_out/
+secrets/
+.env
+.integ_env.sh
+viewer/node_modules/
+viewer/dist/
+viewer/public/mediapipe/

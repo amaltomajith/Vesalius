@@ -49,7 +49,12 @@ GUARDS: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
     (
         "s8 mask producer",
         _S9_PLUS,
-        ("pipeline.stages.s8_segment.service", "pipeline.stages.s8_segment.segmentation"),
+        (
+            "pipeline.stages.s8_segment.service",
+            "pipeline.stages.s8_segment.segmentation",
+            "pipeline.stages.s8_segment.structures_service",
+            "pipeline.stages.s8_segment.structures",
+        ),
     ),
     (
         # mesh_io is deliberately NOT forbidden: like nifti_io for S6-S8, it is a generic
@@ -60,6 +65,8 @@ GUARDS: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
         (
             "pipeline.stages.s9_surface_extraction.service",
             "pipeline.stages.s9_surface_extraction.mesh_extract",
+            "pipeline.stages.s9_surface_extraction.structures_service",
+            "pipeline.stages.s9_surface_extraction.structure_meshing",
         ),
     ),
     (
@@ -68,6 +75,8 @@ GUARDS: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
         (
             "pipeline.stages.s10_mesh_postprocess.service",
             "pipeline.stages.s10_mesh_postprocess.mesh_postprocess",
+            "pipeline.stages.s10_mesh_postprocess.structures_service",
+            "pipeline.stages.s10_mesh_postprocess.structures_budget",
         ),
     ),
 )
@@ -121,7 +130,11 @@ def test_stages_strictly_downstream_of_a_producer_never_import_its_internals(
     name: str, dirs: tuple[str, ...], forbidden: tuple[str, ...]
 ) -> None:
     offenders = {}
-    guarded_dirs = [SRC / d for d in dirs if (SRC / d).exists()]
+    # the stage packages live under src/pipeline/stages/; a missing directory is an error, never
+    # a silent skip (an earlier `if exists()` filter here quietly reduced the scan to src/api)
+    guarded_dirs = [SRC / "stages" / d for d in dirs]
+    missing = [str(d) for d in guarded_dirs if not d.is_dir()]
+    assert not missing, f"guarded directories moved -- update the guard: {missing}"
     for path in _py_files(*guarded_dirs, API):
         hits = _module_hits(path.read_text(encoding="utf-8"), forbidden)
         if hits:

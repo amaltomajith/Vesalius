@@ -5,14 +5,14 @@ modalities"), honestly -- including any misses, per CLAUDE.md rule 8 ("never wea
 to make it pass") and TESTING.md's own "a known, documented gap is far better than an
 inflated claim."
 
-Only CT is exercised through the full pipeline: S3's QG_MODALITY_UNSUPPORTED check
-quarantines any series whose modality isn't CT/MR before it ever reaches S4/S5 (this
-project's volumetric pipeline is CT/MR-only, confirmed during S3's implementation) -- so a
-US series cannot flow through ingest->...->deidentify_and_verify_batch at all. This is a
-real project constraint, not a scope-narrowing choice; testing PHI removal against a
-quarantined-before-S4 instance would not exercise S4/S5's channels regardless of modality
-label. The burned-in-pixel channel is exercised identically via CT with injected pixel
-text, so no channel coverage is lost.
+CT and MR are both exercised through the full pipeline (S3 admits exactly CT/MR; a US series is
+quarantined by QG_MODALITY_UNSUPPORTED before S4, so it cannot be measured here -- a real project
+constraint, stated rather than hidden). The reported rate is therefore "across 2 modalities".
+
+Each run also carries POSITIVE CONTROLS: every injected identifier -- and the burned-in text,
+as seen by OCR -- is first shown to be present in the input, so a pass cannot be vacuous. The
+audit check is per identifier: `deid_audit` must hold a row for each injected tag, for the
+private tag, and for a real redacted pixel region.
 
 Uses its own small tag-value walker below, deliberately not importing s4_deidentify or
 s5_verify internals -- the proof exercises the pipeline's real output artifact (the silver
@@ -25,6 +25,8 @@ import io
 from pathlib import Path
 
 import pydicom
+import pytest
+from pydicom.datadict import tag_for_keyword
 from sqlalchemy import select
 
 from pipeline.catalog.models import DeidAudit
@@ -35,7 +37,7 @@ from pipeline.stages.s1_ingest.service import ingest
 from pipeline.stages.s2_parse_index.service import parse_and_index_batch
 from pipeline.stages.s3_quality_gate.service import quality_gate_batch
 from tests.fixtures.archive_builder import build_zip
-from tests.fixtures.dicom_factory import build_clean_ct_series
+from tests.fixtures.dicom_factory import build_series
 from tests.fixtures.shared import integration, ocr
 
 # TESTING.md Proof 1's exact injection list.
@@ -84,9 +86,17 @@ def _no_private_tags_present(ds: pydicom.dataset.Dataset) -> bool:
     return True
 
 
+def _tag_id(keyword: str) -> str:
+    t = tag_for_keyword(keyword)
+    assert t is not None, keyword
+    return f"({t >> 16:04X},{t & 0xFFFF:04X})"
+
+
 @integration
 @ocr
+@pytest.mark.parametrize("modality", ["CT", "MR"])
 def test_phi_injection_removed_across_all_three_channels(
+    modality: str,
     pipeline_session,
     bronze_minio_client,
     silver_minio_client,
@@ -98,8 +108,10 @@ def test_phi_injection_removed_across_all_three_channels(
 
     extra_tags = dict(TAG_INJECTIONS)
     private_group, private_vr, private_value = PRIVATE_TAG_INJECTION
-    series_bytes = build_clean_ct_series(
+    series_bytes = build_series(
         count=3,
+        modality=modality,
+        pixel_data="valid",
         body_part="CHEST",
         # Wide enough that the full injected string actually renders within the canvas
         # (confirmed via a real OCR diagnostic run -- a narrower canvas clipped the tail
@@ -115,6 +127,20 @@ def test_phi_injection_removed_across_all_three_channels(
     original_study_uid = str(original_ds.StudyInstanceUID)
     original_series_uid = str(original_ds.SeriesInstanceUID)
     original_sop_uid = str(original_ds.SOPInstanceUID)
+
+    # positive controls: the proof is only meaningful if the input really carries what we claim
+    assert original_ds.Modality == modality
+    for tag_name, injected_value in TAG_INJECTIONS:
+        assert not _string_absent_everywhere(original_ds, injected_value), (
+            f"control failed: {tag_name}={injected_value!r} is not in the input"
+        )
+    assert original_ds[PRIVATE_TAG_INJECTION[0]].value == PRIVATE_TAG_INJECTION[2]
+    seen_in_input = " ".join(
+        r.text for r in detect_text_regions(render_pixel_array_to_image(original_ds.pixel_array))
+    )
+    assert "TESTPHI" in seen_in_input and "88231" in seen_in_input, (
+        f"control failed: OCR cannot see the burned-in text in the INPUT ({seen_in_input!r})"
+    )
 
     archive = build_zip(
         tmp_path, "phi.zip", {f"scan{i}.dcm": data for i, data in enumerate(series_bytes)}
@@ -165,17 +191,21 @@ def test_phi_injection_removed_across_all_three_channels(
         .scalars()
         .all()
     )
-    audit_channels_present = {r.channel for r in audit_rows}
-    if "tag" not in audit_channels_present:
-        misses.append("deid_audit:no tag-channel rows")
-    if "private" not in audit_channels_present:
-        misses.append("deid_audit:no private-channel rows")
-    if "pixel" not in audit_channels_present:
-        misses.append("deid_audit:no pixel-channel rows")
+    audited = {(r.channel, r.tag) for r in audit_rows}
+    for tag_name, _ in TAG_INJECTIONS:
+        if ("tag", _tag_id(tag_name)) not in audited:
+            misses.append(f"deid_audit:no row for {tag_name}")
+    private_id = f"({PRIVATE_TAG_INJECTION[0][0]:04X},{PRIVATE_TAG_INJECTION[0][1]:04X})"
+    if ("private", private_id) not in audited:
+        misses.append(f"deid_audit:no row for private tag {private_id}")
+    if not any(
+        r.channel == "pixel" and r.action == "redact" and r.pixel_region for r in audit_rows
+    ):
+        misses.append("deid_audit:no redacted pixel region recorded")
 
     removed = TOTAL_INJECTIONS - len(
         [m for m in misses if not m.startswith(("uid:", "deid_audit:"))]
     )
-    phi_report.record(modality="CT", total=TOTAL_INJECTIONS, removed=removed, misses=misses)
+    phi_report.record(modality=modality, total=TOTAL_INJECTIONS, removed=removed, misses=misses)
 
     assert not misses, f"PHI injection misses: {misses}"

@@ -215,6 +215,73 @@ def get_gold_artifact(session: Session, artifact_id: UUID) -> tuple[ArtifactOut,
     return None if a is None else (_artifact_out(a), a.object_key)
 
 
+STRUCTURES_MANIFEST_SUFFIX = "/mesh/structures.json"
+GROUP_KEY_RE = re.compile(r"^[a-z]+$")
+
+
+def structure_studies(session: Session) -> list[dict[str, Any]]:
+    """Series that have a structures manifest in gold, newest first, with study facts."""
+    rows = session.execute(
+        select(Artifact, Series, Study)
+        .join(Series, Series.id == Artifact.series_id)
+        .join(Study, Study.id == Series.study_id)
+        .where(
+            Artifact.zone == params.SERVED_ZONE,
+            Artifact.object_key.endswith(STRUCTURES_MANIFEST_SUFFIX),
+        )
+        .order_by(Artifact.created_at.desc())
+    ).all()
+    out = []
+    for art, series, study in rows:
+        thumb = session.execute(
+            select(Artifact.id).where(
+                Artifact.zone == params.SERVED_ZONE,
+                Artifact.series_id == series.id,
+                Artifact.object_key == f"{series.id}/thumbnail.png",
+            )
+        ).scalar_one_or_none()
+        out.append(
+            {
+                "id": str(series.id),
+                "modality": study.modality,
+                "body_part": study.body_part,
+                "shifted_study_date": (
+                    study.shifted_study_date.isoformat() if study.shifted_study_date else None
+                ),
+                "slice_count": series.instance_count,
+                "manifest_bytes": art.bytes,
+                "thumbnail_artifact_id": str(thumb) if thumb else None,
+            }
+        )
+    return out
+
+
+def structures_manifest_key(session: Session, series_id: UUID) -> str | None:
+    key = f"{series_id}{STRUCTURES_MANIFEST_SUFFIX}"
+    a = session.execute(
+        select(Artifact).where(
+            Artifact.zone == params.SERVED_ZONE,
+            Artifact.series_id == series_id,
+            Artifact.object_key == key,
+        )
+    ).scalar_one_or_none()
+    return None if a is None else a.object_key
+
+
+def mesh_group_key(session: Session, series_id: UUID, group: str) -> str | None:
+    if not GROUP_KEY_RE.match(group):
+        return None
+    key = f"{series_id}/mesh/{group}.glb"
+    a = session.execute(
+        select(Artifact).where(
+            Artifact.zone == params.SERVED_ZONE,
+            Artifact.series_id == series_id,
+            Artifact.object_key == key,
+        )
+    ).scalar_one_or_none()
+    return None if a is None else a.object_key
+
+
 def series_lineage(
     session: Session, series_id: UUID, contract_version: str
 ) -> LineageResponse | None:
